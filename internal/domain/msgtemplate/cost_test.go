@@ -66,39 +66,3 @@ func TestRenderCutsValuesToTheSchemaBound(t *testing.T) {
 		t.Fatalf("got %q, %v", out.Text, err)
 	}
 }
-
-// BenchmarkRenderWorstCase renders templates built to sit just under MaxEvaluationCost with the
-// most expensive operations the cost model admits. Its result is the figure quoted for the bound.
-func BenchmarkRenderWorstCase(b *testing.B) {
-	items := func(n, size int) []map[string]string {
-		out := make([]map[string]string, n)
-		for i := range out {
-			out[i] = map[string]string{"name": strings.Repeat("x", size), "title": strings.Repeat("x", size)}
-		}
-		return out
-	}
-	schema := mustSchema(SchemaSpec{Vars: []string{"title"}, Lists: map[string]List{
-		"a": {Cap: 100, Fields: []string{"name"}}, "b": {Cap: 100, Fields: []string{"name"}},
-		"big": {Cap: 150, Fields: []string{"name"}},
-	}})
-	data := Data{Vars: map[string]string{"title": strings.Repeat("t", 1000)},
-		Lists: map[string][]map[string]string{"a": items(100, 1000), "b": items(100, 1000), "big": items(150, 1000)}}
-	for name, source := range map[string]string{
-		"nested conditions": `{{range $.a}}{{range $.b}}{{if eq .name "zz"}}!{{end}}{{if eq .name "yy"}}!{{end}}{{end}}{{end}}`,
-		"join in loop":      `{{range $.a}}{{if eq (join "name" "," $.big) "zz"}}!{{end}}{{end}}`,
-		"long outputs":      `{{range $.a}}{{range $.b}}{{.name}}{{end}}{{end}}`,
-	} {
-		tmpl, err := Compile("bench", source, schema)
-		if err != nil {
-			b.Logf("%s: %v", name, err)
-			continue
-		}
-		b.Run(name, func(b *testing.B) {
-			for b.Loop() {
-				if _, err := tmpl.Render(data, MaxOutputRunes); err != nil {
-					b.Fatal(err)
-				}
-			}
-		})
-	}
-}

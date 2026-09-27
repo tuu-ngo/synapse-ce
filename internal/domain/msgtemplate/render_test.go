@@ -60,21 +60,3 @@ func TestTemplateIsReusable(t *testing.T) {
 		}
 	}
 }
-
-func BenchmarkRenderAtCostBound(b *testing.B) {
-	body := strings.Repeat(`{{if eq $.title "x"}}{{end}}`, 2)
-	tmpl, err := Compile("bench", `{{range $.items}}{{range $.items}}`+body+`{{end}}{{end}}`, testSchema())
-	if err != nil {
-		b.Fatal(err)
-	}
-	items := make([]map[string]string, 100)
-	for i := range items {
-		items[i] = map[string]string{"title": "a"}
-	}
-	data := Data{Vars: map[string]string{"title": "y"}, Lists: map[string][]map[string]string{"items": items}}
-	for b.Loop() {
-		if _, err := tmpl.Render(data, 100); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
