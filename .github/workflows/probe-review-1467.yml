@@ -1,0 +1,19 @@
+name: Probe review 1467
+on:
+  push:
+    branches: [probe/review-1467]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go test -count=1 -race -cover ./internal/domain/msgtemplate ./internal/domain/textsafety ./internal/usecase/sarifingest
+      - run: go test -count=1 -race -run 'TestTemplateIsReusable|TestEveryOutputPositionIsEscaped' -cpu 1,4,16 ./internal/domain/msgtemplate
+      - run: go test -run='^$' -fuzz=FuzzCompileRender -fuzztime=180s ./internal/domain/msgtemplate
+      - run: go test -run='^$' -fuzz=FuzzEscapedValue -fuzztime=120s ./internal/domain/msgtemplate
+      - run: go test -run='^$' -bench=. -benchtime=20x ./internal/domain/msgtemplate
