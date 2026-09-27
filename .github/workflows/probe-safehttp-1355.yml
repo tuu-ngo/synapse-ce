@@ -1,0 +1,16 @@
+name: Probe safehttp 1355
+on:
+  push:
+    branches: [probe/safehttp-1355]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: go test -count=1 -race -cover ./internal/infrastructure/safehttp ./internal/infrastructure/notificationsender ./internal/infrastructure/alertsink/... ./internal/infrastructure/integration/... ./internal/infrastructure/scmdecoration/... ./internal/infrastructure/secretverify/...
+      - run: go test -count=1 -v -run 'Policy|Dialer|Metadata|Blocks' ./internal/infrastructure/safehttp ./internal/infrastructure/notificationsender 2>&1 | grep -E '^(--- |ok|FAIL)'
