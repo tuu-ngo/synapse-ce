@@ -41,6 +41,7 @@ func TestCompileChecksArgumentTypes(t *testing.T) {
 }
 
 func TestFuncSpecCheck(t *testing.T) {
+	str := stringValue(10)
 	list := value{kind: kList, list: "items"}
 	cases := []struct {
 		name   string
@@ -49,18 +50,18 @@ func TestFuncSpecCheck(t *testing.T) {
 		result kind
 		code   Code
 	}{
-		{"exact arity", "upper", []value{stringValue}, kString, ""},
-		{"too few", "truncate", []value{stringValue}, 0, CodeWrongArgumentCount},
-		{"too many", "upper", []value{stringValue, stringValue}, 0, CodeWrongArgumentCount},
-		{"variadic", "eq", []value{stringValue, stringValue, stringValue}, kBool, ""},
-		{"wrong scalar", "truncate", []value{stringValue, stringValue}, 0, CodeArgumentType},
+		{"exact arity", "upper", []value{str}, kString, ""},
+		{"too few", "truncate", []value{str}, 0, CodeWrongArgumentCount},
+		{"too many", "upper", []value{str, str}, 0, CodeWrongArgumentCount},
+		{"variadic", "eq", []value{str, str, str}, kBool, ""},
+		{"wrong scalar", "truncate", []value{str, str}, 0, CodeArgumentType},
 		{"list where scalar", "upper", []value{list}, 0, CodeListMisuse},
-		{"scalar where list", "count", []value{stringValue}, 0, CodeListMisuse},
+		{"scalar where list", "count", []value{str}, 0, CodeListMisuse},
 		{"list parameter", "count", []value{list}, kInt, ""},
-		{"accepted union", "plural", []value{stringValue, stringValue, stringValue}, kString, ""},
-		{"mixed comparison", "eq", []value{stringValue, intValue}, 0, CodeArgumentType},
-		{"union comparison", "ne", []value{{kind: kString | kInt}, stringValue}, 0, CodeArgumentType},
-		{"and returns union", "and", []value{stringValue, intValue}, kString | kInt, ""},
+		{"accepted union", "plural", []value{str, str, str}, kString, ""},
+		{"mixed comparison", "eq", []value{str, intValue}, 0, CodeArgumentType},
+		{"union comparison", "ne", []value{{kind: kString | kInt}, str}, 0, CodeArgumentType},
+		{"and returns union", "and", []value{str, intValue}, kString | kInt, ""},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -73,8 +74,8 @@ func TestFuncSpecCheck(t *testing.T) {
 }
 
 func TestEveryAllowlistedFunctionIsImplemented(t *testing.T) {
-	builtins := map[string]bool{"eq": true, "ne": true, "and": true, "or": true, "not": true}
-	funcs := funcMap()
+	builtins := map[string]bool{"and": true, "or": true, "not": true}
+	funcs := funcMap(&meter{})
 	for name := range funcSpecs {
 		if _, ok := funcs[name]; !ok && !builtins[name] {
 			t.Errorf("%s is allowlisted but not implemented", name)

@@ -30,7 +30,7 @@ func TestRenderFunctions(t *testing.T) {
 		`{{if eq .severity "CRITICAL"}}yes{{end}}`:              "yes",
 	}
 	for source, want := range cases {
-		if got := render(t, source, data); got != want {
+		if got := unescape(render(t, source, data)); got != want {
 			t.Fatalf("%s rendered %q, want %q", source, got, want)
 		}
 	}

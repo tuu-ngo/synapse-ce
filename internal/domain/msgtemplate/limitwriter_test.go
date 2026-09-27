@@ -66,3 +66,20 @@ func TestTruncateRunes(t *testing.T) {
 		}
 	}
 }
+
+func TestTruncatedReportsOnlyTheOutputCap(t *testing.T) {
+	out, err := mustCompile(t, `{{.title | truncate 3}}`).Render(Data{Vars: map[string]string{"title": "abcdef"}}, 100)
+	if err != nil || out.Truncated || unescape(out.Text) != "ab…" {
+		t.Fatalf("truncate function: %+v, %v", out, err)
+	}
+}
+
+func TestTruncateRunesReadsOnlyTheBound(t *testing.T) {
+	long := strings.Repeat("ệ", 50)
+	if got := truncateRunes(long, 5); got != strings.Repeat("ệ", 4)+truncationMarker {
+		t.Fatalf("got %q", got)
+	}
+	if got := truncateRunes("short", 100); got != "short" {
+		t.Fatalf("got %q", got)
+	}
+}

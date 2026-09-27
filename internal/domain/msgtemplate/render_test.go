@@ -33,7 +33,7 @@ func TestRenderCapsListsAtDeclaredCap(t *testing.T) {
 func TestRenderRejectsInvalidLimit(t *testing.T) {
 	tmpl := mustCompile(t, "x")
 	for _, limit := range []int{0, -1, MaxOutputRunes + 1} {
-		if _, err := tmpl.Render(Data{}, limit); !errors.Is(err, ErrRender) {
+		if _, err := tmpl.Render(Data{}, limit); !errors.Is(err, ErrUsage) || errors.Is(err, ErrRender) {
 			t.Fatalf("limit %d: err = %v", limit, err)
 		}
 	}

@@ -34,6 +34,10 @@ func TestCompileRejectsForbiddenConstructs(t *testing.T) {
 		{"declaration in if", `{{if $x := .title}}{{$x}}{{end}}`, CodeForbiddenDeclaration},
 		{"declaration in with", `{{with $x := .title}}{{$x}}{{end}}`, CodeForbiddenDeclaration},
 		{"assignment", `{{range $i, $item := .items}}{{$i = 3}}{{end}}`, CodeForbiddenAssignment},
+		{"redeclare root", `{{range $ := .items}}{{$.title}}{{end}}`, CodeForbiddenDeclaration},
+		{"redeclare root as item", `{{range $i, $ := .items}}{{$i}}{{end}}`, CodeForbiddenDeclaration},
+		{"range variable in else", `{{range $x := .items}}a{{else}}{{$x.title}}{{end}}`, CodeInvalidVariable},
+		{"action in code span", "`{{.title}}`", CodeActionInCodeSpan},
 		{"range integer", `{{range 3}}x{{end}}`, CodeInvalidRange},
 		{"range scalar", `{{range .title}}x{{end}}`, CodeInvalidRange},
 		{"range pipeline", `{{range .items | count}}x{{end}}`, CodeInvalidRange},
@@ -94,21 +98,6 @@ func TestCompileAcceptsAllowedConstructs(t *testing.T) {
 	}
 	for _, source := range cases {
 		mustCompile(t, source)
-	}
-}
-
-func TestCompileRejectsInvalidSchema(t *testing.T) {
-	for _, schema := range []Schema{
-		{Vars: []string{"Title"}},
-		{Vars: []string{"title", "title"}},
-		{Vars: []string{"items"}, Lists: map[string]List{"items": {Cap: 1, Fields: []string{"a"}}}},
-		{Lists: map[string]List{"items": {Cap: 0, Fields: []string{"a"}}}},
-		{Lists: map[string]List{"items": {Cap: 1}}},
-		{Lists: map[string]List{"items": {Cap: 1, Fields: []string{"a-b"}}}},
-	} {
-		if _, err := Compile("test", "x", schema); err == nil {
-			t.Fatalf("schema %+v accepted", schema)
-		}
 	}
 }
 

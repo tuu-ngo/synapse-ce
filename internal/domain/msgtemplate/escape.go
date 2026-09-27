@@ -2,49 +2,33 @@ package msgtemplate
 
 import "strings"
 
-// inlineSpecial lists the characters the Markdown subset (and the chat syntaxes built on it) treat
-// as markup anywhere in a line.
-const inlineSpecial = "\\*_`[]<>~|"
+// asciiPunctuation is every character CommonMark allows a backslash to escape. Every piece of
+// CommonMark and GFM syntax is built from these characters: emphasis, code spans, links, images,
+// autolinks, entity references, HTML, headings (ATX and setext), thematic breaks, block quotes, list
+// markers, fences, tables and strikethrough. Escaping all of them, rather than a hand-picked subset,
+// leaves nothing to forget; the bare URL, www and email autolinks of GFM stop matching because their
+// ":", "." and "@" are escaped.
+const asciiPunctuation = "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
 
-// blockSpecial lists the characters that start a block (bullet, heading, quote) at the beginning of
-// a line.
-const blockSpecial = "-+#"
-
-// EscapeMarkdown backslash-escapes a value so that the Markdown subset treats it as literal text.
-// The value must already be sanitized, so it holds no line break and can only begin a line at its
-// first character. Formatters that consume the subset unescape a backslash followed by any ASCII
-// punctuation.
+// EscapeMarkdown makes a value literal text in the message Markdown subset.
+//
+// The subset is an intermediate CommonMark representation, not a chat syntax: the per-channel
+// formatters parse it, honouring backslash escapes, and emit each channel's own escaping (for
+// example &lt; &gt; &amp; for Slack mrkdwn). The escaping is correct in text, emphasis and list
+// context. It is not correct inside a code span, where CommonMark shows backslashes literally, so
+// the validator rejects an action written between backticks.
+//
+// The value must already be sanitized, so it holds no line break. Leading spaces are dropped: four
+// of them would start an indented code block, and they carry no meaning in an inline value.
 func EscapeMarkdown(value string) string {
+	value = strings.TrimLeft(value, " ")
 	var b strings.Builder
-	b.Grow(len(value) + 8)
-	rest := escapeBlockStart(&b, value)
-	for i := 0; i < len(rest); i++ {
-		if strings.IndexByte(inlineSpecial, rest[i]) >= 0 {
+	b.Grow(len(value) + len(value)/4)
+	for i := 0; i < len(value); i++ {
+		if strings.IndexByte(asciiPunctuation, value[i]) >= 0 {
 			b.WriteByte('\\')
 		}
-		b.WriteByte(rest[i])
+		b.WriteByte(value[i])
 	}
 	return b.String()
-}
-
-// escapeBlockStart writes the leading spaces and escapes a block marker that would start a bullet,
-// a heading or an ordered list if the value began a line. It returns the rest of the value.
-// Escaping only at the start keeps values such as CVE-2024-1 readable.
-func escapeBlockStart(b *strings.Builder, value string) string {
-	start := len(value) - len(strings.TrimLeft(value, " "))
-	b.WriteString(value[:start])
-	rest := value[start:]
-	if rest != "" && strings.IndexByte(blockSpecial, rest[0]) >= 0 {
-		b.WriteByte('\\')
-		b.WriteByte(rest[0])
-		return rest[1:]
-	}
-	digits := len(rest) - len(strings.TrimLeft(rest, "0123456789"))
-	if digits > 0 && digits < len(rest) && (rest[digits] == '.' || rest[digits] == ')') {
-		b.WriteString(rest[:digits])
-		b.WriteByte('\\')
-		b.WriteByte(rest[digits])
-		return rest[digits+1:]
-	}
-	return rest
 }

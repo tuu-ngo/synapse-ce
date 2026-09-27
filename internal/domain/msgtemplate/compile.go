@@ -8,17 +8,16 @@ import (
 
 // Template is a validated, immutable, reusable template. It is safe for concurrent Render calls.
 type Template struct {
-	schema compiledSchema
+	schema *Schema
 	tmpl   *template.Template
 }
 
 // Compile parses and validates source against schema. An accepted template references only
 // declared variables and allowlisted functions, passes the type check, and stays within the static
-// bounds in limits.go.
-func Compile(name, source string, schema Schema) (*Template, error) {
-	compiled, err := compileSchema(schema)
-	if err != nil {
-		return nil, err
+// bounds in limits.go. Rejections wrap ErrInvalidTemplate; a nil schema wraps ErrUsage.
+func Compile(name, source string, schema *Schema) (*Template, error) {
+	if schema == nil {
+		return nil, usageError(CodeInvalidSchema)
 	}
 	if err := checkName(name); err != nil {
 		return nil, err
@@ -30,12 +29,12 @@ func Compile(name, source string, schema Schema) (*Template, error) {
 	if err != nil {
 		return nil, err
 	}
-	v := newValidator(source, compiled)
+	v := newValidator(source, schema)
 	if err := v.list(tmpl.Root, scope{}); err != nil {
 		return nil, err
 	}
 	escapeOutputs(tmpl.Tree, tmpl.Root)
-	return &Template{schema: compiled, tmpl: tmpl}, nil
+	return &Template{schema: schema, tmpl: tmpl}, nil
 }
 
 func checkName(name string) error {
@@ -66,7 +65,7 @@ func checkSource(source string) error {
 // parseSource builds the text/template tree and rejects anything that defines more than the one
 // template being compiled (define, block).
 func parseSource(name, source string) (*template.Template, error) {
-	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap()).Parse(source)
+	tmpl, err := template.New(name).Option("missingkey=error").Funcs(funcMap(&meter{})).Parse(source)
 	if err != nil {
 		return nil, invalid(CodeParse, 0, strings.TrimPrefix(err.Error(), "template: "))
 	}

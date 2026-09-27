@@ -22,7 +22,7 @@ type variable struct {
 type scope struct {
 	dot      dotKind
 	item     string // list whose item is dot, when dot == dotItem
-	dotValue kind   // static type of dot, when dot == dotScalar
+	dotValue value  // static type of dot, when dot == dotScalar
 	vars     map[string]variable
 }
 
@@ -31,15 +31,15 @@ type scope struct {
 // It tracks the static bounds in limits.go as it goes. Expression checks live in validate_expr.go.
 type validator struct {
 	source  string
-	schema  compiledSchema
+	schema  *Schema
 	nodes   int
-	cost    int
+	cost    int64
 	control int // current if/with/range nesting
 	ranges  int // current range nesting
 	product int // product of the list caps of the enclosing ranges
 }
 
-func newValidator(source string, schema compiledSchema) *validator {
+func newValidator(source string, schema *Schema) *validator {
 	return &validator{source: source, schema: schema, product: 1}
 }
 
@@ -51,14 +51,19 @@ func (v *validator) fail(code Code, node parse.Node, detail string) error {
 	return invalid(code, line, detail)
 }
 
-// count bounds both the size of the tree and the number of node evaluations in the worst case: a
-// node inside ranges is weighted by the product of their caps.
+// count bounds the size of the tree and charges one evaluation of node.
 func (v *validator) count(node parse.Node) error {
 	v.nodes++
 	if v.nodes > MaxNodes {
 		return v.fail(CodeTooManyNodes, node, "")
 	}
-	v.cost += v.product
+	return v.charge(node, 1)
+}
+
+// charge adds units of work, weighted by the product of the caps of the enclosing ranges, so the
+// total is the worst-case work of one render.
+func (v *validator) charge(node parse.Node, units int64) error {
+	v.cost += int64(v.product) * units
 	if v.cost > MaxEvaluationCost {
 		return v.fail(CodeCostBoundExceeded, node, "")
 	}
@@ -72,10 +77,29 @@ func (v *validator) list(list *parse.ListNode, sc scope) error {
 	if err := v.count(list); err != nil {
 		return err
 	}
-	for _, node := range list.Nodes {
+	for i, node := range list.Nodes {
 		if err := v.node(node, sc); err != nil {
 			return err
 		}
+		if err := v.codeSpan(list.Nodes, i); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// codeSpan rejects an action written between backticks, as in `{{.cve}}`. Backslash escapes do not
+// work inside a code span, so the value would show its escapes, and a backtick in the value would
+// end the span early.
+func (v *validator) codeSpan(nodes []parse.Node, i int) error {
+	action, ok := nodes[i].(*parse.ActionNode)
+	if !ok || i == 0 || i == len(nodes)-1 {
+		return nil
+	}
+	before, okBefore := nodes[i-1].(*parse.TextNode)
+	after, okAfter := nodes[i+1].(*parse.TextNode)
+	if okBefore && okAfter && strings.HasSuffix(string(before.Text), "`") && strings.HasPrefix(string(after.Text), "`") {
+		return v.fail(CodeActionInCodeSpan, action, "")
 	}
 	return nil
 }
@@ -87,7 +111,7 @@ func (v *validator) node(node parse.Node, sc scope) error {
 	switch n := node.(type) {
 	case *parse.TextNode:
 		return v.text(n)
-	case *parse.CommentNode, *parse.BreakNode, *parse.ContinueNode:
+	case *parse.BreakNode, *parse.ContinueNode:
 		return nil
 	case *parse.ActionNode:
 		return v.action(n, sc)
@@ -113,7 +137,8 @@ func (v *validator) text(n *parse.TextNode) error {
 	return nil
 }
 
-// action validates an output action; it must print a scalar, never a whole list.
+// action validates an output action; it must print a scalar, never a whole list. The escape step
+// appended by rewrite.go reads the value twice (sanitize, then escape) and is charged for it.
 func (v *validator) action(n *parse.ActionNode, sc scope) error {
 	result, err := v.pipe(n.Pipe, sc)
 	if err != nil {
@@ -122,7 +147,7 @@ func (v *validator) action(n *parse.ActionNode, sc scope) error {
 	if result.isList() {
 		return v.fail(CodeListMisuse, n, result.list)
 	}
-	return nil
+	return v.charge(n, runeUnits(2*result.runes))
 }
 
 // branch validates if and with. An else-if or else-with chain stays at the nesting level of its
@@ -143,7 +168,7 @@ func (v *validator) branch(b *parse.BranchNode, sc scope, with, chained bool) er
 	}
 	inner := sc
 	if with {
-		inner = scope{dot: dotScalar, dotValue: result.kind, vars: sc.vars}
+		inner = scope{dot: dotScalar, dotValue: result, vars: sc.vars}
 	}
 	if err := v.list(b.List, inner); err != nil {
 		return err
@@ -239,8 +264,15 @@ func (v *validator) rangeList(n *parse.RangeNode, sc scope) (string, error) {
 }
 
 // declare returns the variables visible in a range body: the enclosing ones plus the range's own
-// index and item variables. Range is the only place a template may declare a variable.
+// index and item variables. Range is the only place a template may declare a variable, and $ may
+// not be redeclared: text/template would rebind it to the item while every $.name reference is
+// checked against the root.
 func (v *validator) declare(pipe *parse.PipeNode, sc scope, listName string) (map[string]variable, error) {
+	for _, decl := range pipe.Decl {
+		if decl.Ident[0] == "$" {
+			return nil, v.fail(CodeForbiddenDeclaration, decl, "$")
+		}
+	}
 	vars := make(map[string]variable, len(sc.vars)+len(pipe.Decl))
 	for name, info := range sc.vars {
 		vars[name] = info

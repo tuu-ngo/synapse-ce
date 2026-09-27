@@ -1,11 +1,19 @@
 package msgtemplate
 
-import "strings"
+import (
+	"strings"
 
-// Sanitize removes characters that can reorder, hide or break rendered text: C0 and C1 controls,
-// bidirectional controls, zero-width and other invisible characters. Line breaks and tabs become a
-// single space, so an interpolated value can never start a new Markdown block. Invalid UTF-8 is
-// replaced with U+FFFD.
+	"github.com/KKloudTarus/synapse-ce/internal/domain/textsafety"
+)
+
+// Sanitize removes characters that can reorder, hide or break rendered text. Line breaks and tabs
+// become a single space, so an interpolated value can never start a new Markdown block. Invalid
+// UTF-8 is replaced with U+FFFD.
+//
+// The control, bidirectional and invisible-separator classes come from package textsafety, the
+// definition SARIF ingest also uses, so a stored title and the same title in a message agree. In
+// particular the zero-width joiner and non-joiner are kept, because Persian, Devanagari and emoji
+// sequences need them.
 func Sanitize(value string) string {
 	value = strings.ToValidUTF8(value, string(rune(0xfffd)))
 	var b strings.Builder
@@ -30,25 +38,19 @@ func lineBreak(r rune) bool {
 // forbiddenRune reports every rune that is invisible or changes how surrounding text renders. Tab,
 // CR and LF are reported too; callers that allow them check for them first.
 func forbiddenRune(r rune) bool {
-	return controlRune(r) || bidiControl(r) || invisibleRune(r)
+	return textsafety.IsControl(r) || textsafety.IsBidiControl(r) ||
+		textsafety.IsInvisibleSeparator(r) || hiddenInMessage(r)
 }
 
-// controlRune reports C0 controls, DEL and C1 controls.
-func controlRune(r rune) bool {
-	return r < 0x20 || r == 0x7f || (r >= 0x80 && r <= 0x9f)
-}
-
-// bidiControl reports the embedding, override and isolate controls and the directional marks.
-func bidiControl(r rune) bool {
-	return (r >= 0x202a && r <= 0x202e) || (r >= 0x2066 && r <= 0x2069) ||
-		r == 0x200e || r == 0x200f || r == 0x061c
-}
-
-// invisibleRune reports characters that render as nothing and can hide text: zero-width
-// characters, the word joiner, the byte order mark, the soft hyphen, the Mongolian vowel separator,
-// invisible math operators, interlinear annotation controls and tag characters.
-func invisibleRune(r rune) bool {
-	return (r >= 0x200b && r <= 0x200d) || r == 0x2060 || r == 0xfeff ||
-		r == 0x00ad || r == 0x180e || (r >= 0x2061 && r <= 0x2064) ||
+// hiddenInMessage reports characters that render as nothing and can hide text in a message sent to
+// an external channel: the word joiner, invisible math operators, the soft hyphen, the Mongolian
+// vowel separator, interlinear annotation controls and tag characters. Tag characters are the
+// carrier of "ASCII smuggling"; the cost of removing them is that a subdivision flag such as
+// Scotland's shows as a plain black flag.
+//
+// These go further than textsafety because a stored value is shown in the console, where the
+// reader can inspect it, while a message is read in a client Synapse does not control.
+func hiddenInMessage(r rune) bool {
+	return r == 0x2060 || (r >= 0x2061 && r <= 0x2064) || r == 0x00ad || r == 0x180e ||
 		(r >= 0xfff9 && r <= 0xfffb) || (r >= 0xe0000 && r <= 0xe007f)
 }

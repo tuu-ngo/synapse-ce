@@ -12,10 +12,13 @@ const (
 	MaxRangeNesting = 2
 	// MaxIterationProduct caps the product of the list caps along any chain of nested ranges.
 	MaxIterationProduct = 10000
-	// MaxEvaluationCost bounds the node evaluations of one render: every node counts once per
-	// iteration of the ranges around it. It keeps the worst case in the low milliseconds, which the
-	// node and iteration bounds alone do not (2,000 nodes inside 10,000 iterations).
+	// MaxEvaluationCost bounds the work of one render in cost units (cost.go). A node evaluation is
+	// one unit and a function processes costRunesPerUnit runes per unit; every unit is charged once
+	// per iteration of the ranges around it. The same budget is enforced again at render time by the
+	// meter (meter.go).
 	MaxEvaluationCost = 200000
+	// DefaultMaxValueRunes is the value length bound when a SchemaSpec sets none.
+	DefaultMaxValueRunes = 1000
 	// MaxOutputRunes is the largest per-field output a caller may request (ticket description).
 	MaxOutputRunes = 30000
 )

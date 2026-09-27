@@ -56,13 +56,24 @@ func runePrefixBytes(p []byte, n int) int {
 }
 
 // truncateRunes cuts value to at most max runes, ending a cut value with the truncation marker.
+// It reads at most max runes of value, so bounding every value of a large render context costs time
+// proportional to the bound, not to the data.
 func truncateRunes(value string, max int) string {
 	if max <= 0 {
 		return ""
 	}
-	if utf8.RuneCountInString(value) <= max {
+	if len(value) <= max { // a string never has more runes than bytes
 		return value
 	}
-	runes := []rune(value)
-	return string(runes[:max-1]) + truncationMarker
+	keep, runes := 0, 0
+	for i := range value {
+		if runes == max-1 {
+			keep = i
+		}
+		if runes == max {
+			return value[:keep] + truncationMarker
+		}
+		runes++
+	}
+	return value
 }

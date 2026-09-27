@@ -2,7 +2,9 @@ package msgtemplate
 
 import (
 	"errors"
+	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func TestErrorReportsLine(t *testing.T) {
@@ -36,5 +38,13 @@ func TestLineOf(t *testing.T) {
 		if got := lineOf(source, offset); got != want {
 			t.Fatalf("lineOf(%d) = %d, want %d", offset, got, want)
 		}
+	}
+}
+
+func TestErrorDetailIsCapped(t *testing.T) {
+	_, err := Compile("test", "{{."+strings.Repeat("z", 16000)+"}}", testSchema())
+	var tmplErr *Error
+	if !errors.As(err, &tmplErr) || utf8.RuneCountInString(tmplErr.Detail) > maxDetailRunes || len(err.Error()) > 400 {
+		t.Fatalf("detail not capped: %d runes", utf8.RuneCountInString(tmplErr.Detail))
 	}
 }

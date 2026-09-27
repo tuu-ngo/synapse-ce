@@ -16,20 +16,23 @@ const (
 // single reports whether exactly one type is possible.
 func (k kind) single() bool { return k != 0 && k&(k-1) == 0 }
 
-// value is the static type of an expression. list names the list variable when kind is kList.
+// value is the static type of an expression. list names the list variable when kind is kList;
+// runes bounds the length of a scalar, which the cost model charges functions for reading.
 type value struct {
-	kind kind
-	list string
+	kind  kind
+	list  string
+	runes int
 }
 
 func (v value) isList() bool { return v.kind == kList }
 
 var (
-	stringValue = value{kind: kString}
-	intValue    = value{kind: kInt}
-	floatValue  = value{kind: kFloat}
-	boolValue   = value{kind: kBool}
+	intValue   = value{kind: kInt, runes: intRunes}
+	floatValue = value{kind: kFloat, runes: floatRunes}
+	boolValue  = value{kind: kBool, runes: boolRunes}
 )
+
+func stringValue(runes int) value { return value{kind: kString, runes: runes} }
 
 // funcSpec is the static signature of an allowlisted function. params holds the accepted kinds per
 // argument; a variadic function repeats its last entry. A pipeline passes its value as the last
@@ -46,9 +49,10 @@ type funcSpec struct {
 	union bool
 }
 
-// funcSpecs is the complete function allowlist. eq, ne, and, or and not are text/template
-// builtins; every other builtin (call, print, printf, println, index, slice, len, html, js,
-// urlquery) is rejected because it is absent here. funcMap in funcs.go implements the rest.
+// funcSpecs is the complete function allowlist. and, or and not are text/template builtins;
+// funcMap in funcs.go implements the rest, including eq and ne so that comparisons are metered.
+// Every other builtin (call, print, printf, println, index, slice, len, html, js, urlquery) is
+// rejected because it is absent here.
 var funcSpecs = map[string]funcSpec{
 	"default":        {params: []kind{kString, kString}, min: 2, result: kString},
 	"upper":          {params: []kind{kString}, min: 1, result: kString},
@@ -87,5 +91,5 @@ func (s funcSpec) check(args []value) (value, Code, bool) {
 	if s.union {
 		return value{kind: union}, "", true
 	}
-	return value{kind: s.result}, "", true
+	return value{kind: s.result}, "", true // the validator fills in the length bound
 }

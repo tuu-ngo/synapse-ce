@@ -16,6 +16,10 @@ func FuzzCompileRender(f *testing.F) {
 		`{{define "x"}}{{end}}`,
 		`{{range 3}}{{end}}`,
 		`{{call .title}}`,
+		`{{range $i, $x := .items}}{{$i}}{{end}}`,
+		`{{range $ := .items}}{{$.title}}{{end}}`,
+		`{{with .owner}}{{. | upper}}{{end}}`,
+		`{{join "title" ", " .items | truncate 20}}`,
 	} {
 		f.Add(seed, "[x](https://evil.example) <!channel>", 50)
 	}
@@ -68,7 +72,7 @@ func FuzzEscapedValue(f *testing.F) {
 			if r != ' ' && forbiddenRune(r) {
 				t.Fatalf("forbidden rune %U at %d", r, i)
 			}
-			if !escaped && r < utf8.RuneSelf && strings.ContainsRune(inlineSpecial, r) && r != '\\' {
+			if !escaped && r < utf8.RuneSelf && strings.ContainsRune(asciiPunctuation, r) && r != '\\' {
 				t.Fatalf("unescaped %q at %d in %q", r, i, out.Text)
 			}
 			escaped = !escaped && r == '\\'

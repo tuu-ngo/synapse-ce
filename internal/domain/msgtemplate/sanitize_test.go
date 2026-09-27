@@ -19,3 +19,17 @@ func TestSanitizeRemovesInvisibleCharacters(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestSanitizeKeepsJoinersAndDropsTags(t *testing.T) {
+	family := string([]rune{0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467})
+	persian := "می" + string(rune(0x200c)) + "خواهم"
+	for _, keep := range []string{family, persian} {
+		if got := Sanitize(keep); got != keep {
+			t.Fatalf("Sanitize changed %q to %q", keep, got)
+		}
+	}
+	smuggled := "ok" + string([]rune{0xe0041, 0xe0042}) + "!"
+	if got := Sanitize(smuggled); got != "ok!" {
+		t.Fatalf("tag characters kept: %q", got)
+	}
+}

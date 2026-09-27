@@ -20,6 +20,7 @@ const (
 	CodeParse              Code = "parse_error"
 	CodeEmptyTemplate      Code = "empty_template"
 	CodeDanglingEscape     Code = "dangling_escape"
+	CodeActionInCodeSpan   Code = "action_in_code_span"
 )
 
 // Structural rejections from the tree walk.
@@ -57,25 +58,45 @@ const (
 
 // Render failures.
 const (
-	CodeInvalidLimit    Code = "invalid_limit"
-	CodeInvalidArgument Code = "invalid_argument"
-	CodeRenderFailed    Code = "render_failed"
+	CodeInvalidLimit         Code = "invalid_limit"
+	CodeInvalidArgument      Code = "invalid_argument"
+	CodeRenderBudgetExceeded Code = "render_budget_exceeded"
+	CodeRenderFailed         Code = "render_failed"
 )
 
 var (
-	// ErrInvalidTemplate wraps every compile-time rejection.
+	// ErrInvalidTemplate wraps every rejection of tenant-authored template source.
 	ErrInvalidTemplate = errors.New("msgtemplate: invalid template")
-	// ErrRender wraps every render-time failure.
+	// ErrRender wraps every render failure caused by the template or its data.
 	ErrRender = errors.New("msgtemplate: render failed")
+	// ErrInvalidSchema wraps a bad SchemaSpec, which is a bug in the calling code, not the tenant's.
+	ErrInvalidSchema = errors.New("msgtemplate: invalid schema")
+	// ErrUsage wraps a caller mistake such as a nil schema or an out-of-range output limit, so a
+	// caller that falls back to a built-in template never books its own bug against the tenant.
+	ErrUsage = errors.New("msgtemplate: invalid use")
+)
+
+// maxDetailRunes caps Error.Detail, which may quote template source, so a 16 KiB identifier cannot
+// reach every log line and API error body.
+const maxDetailRunes = 200
+
+type errorKind int
+
+const (
+	kindTemplate errorKind = iota
+	kindRender
+	kindSchema
+	kindUsage
 )
 
 // Error describes a rejection or a render failure. Detail holds only text taken from the template
-// source or the schema (an identifier, a parse message); it never holds a rendered value.
+// source or the schema (an identifier, a parse message), capped at maxDetailRunes; it never holds a
+// rendered value.
 type Error struct {
 	Code   Code
 	Line   int
 	Detail string
-	render bool
+	kind   errorKind
 }
 
 func (e *Error) Error() string {
@@ -93,20 +114,33 @@ func (e *Error) Error() string {
 	return b.String()
 }
 
-// Unwrap lets callers classify an error with errors.Is(err, ErrInvalidTemplate) or ErrRender.
+// Unwrap classifies the error as ErrInvalidTemplate, ErrRender, ErrInvalidSchema or ErrUsage.
 func (e *Error) Unwrap() error {
-	if e.render {
+	switch e.kind {
+	case kindRender:
 		return ErrRender
+	case kindSchema:
+		return ErrInvalidSchema
+	case kindUsage:
+		return ErrUsage
 	}
 	return ErrInvalidTemplate
 }
 
 func invalid(code Code, line int, detail string) *Error {
-	return &Error{Code: code, Line: line, Detail: detail}
+	return &Error{Code: code, Line: line, Detail: truncateRunes(detail, maxDetailRunes)}
 }
 
 func renderError(code Code) *Error {
-	return &Error{Code: code, render: true}
+	return &Error{Code: code, kind: kindRender}
+}
+
+func schemaError(detail string) *Error {
+	return &Error{Code: CodeInvalidSchema, Detail: truncateRunes(detail, maxDetailRunes), kind: kindSchema}
+}
+
+func usageError(code Code) *Error {
+	return &Error{Code: code, kind: kindUsage}
 }
 
 // lineOf returns the 1-based line of a byte offset in source.

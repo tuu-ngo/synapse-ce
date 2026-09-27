@@ -3,6 +3,7 @@ package msgtemplate
 import (
 	"strings"
 	"text/template/parse"
+	"unicode/utf8"
 )
 
 // pipe validates a pipeline and returns the static type of its result. Declarations and
@@ -82,6 +83,10 @@ func (v *validator) call(ident *parse.IdentifierNode, operands []parse.Node, sc 
 			return value{}, err
 		}
 	}
+	if err := v.charge(ident, runeUnits(v.inputRunes(ident.Ident, args))); err != nil {
+		return value{}, err
+	}
+	result.runes = v.resultRunes(ident.Ident, args, operands)
 	return result, nil
 }
 
@@ -102,7 +107,7 @@ func (v *validator) operand(node parse.Node, sc scope) (value, error) {
 	}
 	switch n := node.(type) {
 	case *parse.StringNode:
-		return stringValue, nil
+		return stringValue(utf8.RuneCountInString(n.Text)), nil
 	case *parse.BoolNode:
 		return boolValue, nil
 	case *parse.NumberNode:
@@ -113,7 +118,7 @@ func (v *validator) operand(node parse.Node, sc scope) (value, error) {
 		return v.variableNode(n, sc)
 	case *parse.DotNode:
 		if sc.dot == dotScalar {
-			return value{kind: sc.dotValue}, nil
+			return sc.dotValue, nil
 		}
 		return value{}, v.fail(CodeDotOutsideScope, n, "")
 	case *parse.PipeNode:
@@ -176,7 +181,7 @@ func (v *validator) variableNode(n *parse.VariableNode, sc scope) (value, error)
 // root resolves a top-level name to a scalar variable or a list.
 func (v *validator) root(node parse.Node, name string) (value, error) {
 	if v.schema.vars[name] {
-		return stringValue, nil
+		return stringValue(v.schema.maxValueRunes), nil
 	}
 	if _, ok := v.schema.lists[name]; ok {
 		return value{kind: kList, list: name}, nil
@@ -187,7 +192,7 @@ func (v *validator) root(node parse.Node, name string) (value, error) {
 // field resolves a field of an item of list.
 func (v *validator) field(node parse.Node, list, name string) (value, error) {
 	if v.schema.lists[list].fields[name] {
-		return stringValue, nil
+		return stringValue(v.schema.maxValueRunes), nil
 	}
 	return value{}, v.fail(CodeUnknownField, node, list+"."+name)
 }

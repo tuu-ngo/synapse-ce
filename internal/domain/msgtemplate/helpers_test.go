@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func testSchema() Schema {
-	return Schema{
+func testSpec() SchemaSpec {
+	return SchemaSpec{
 		Vars: []string{"title", "severity", "summary", "count_new", "owner"},
 		Lists: map[string]List{
 			"items":    {Cap: 100, Fields: []string{"title", "severity"}},
@@ -13,6 +13,18 @@ func testSchema() Schema {
 			"big":      {Cap: 200, Fields: []string{"name"}},
 		},
 	}
+}
+
+func testSchema() *Schema {
+	return mustSchema(testSpec())
+}
+
+func mustSchema(spec SchemaSpec) *Schema {
+	schema, err := NewSchema(spec)
+	if err != nil {
+		panic(err)
+	}
+	return schema
 }
 
 func mustCompile(t *testing.T, source string) *Template {
