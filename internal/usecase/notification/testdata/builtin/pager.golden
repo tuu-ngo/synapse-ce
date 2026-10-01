@@ -1,0 +1,48 @@
+== finding.ownership_changed signal summary
+Synapse: finding ownership changed
+== finding.ownership_changed summary summary
+Synapse: finding ownership changed: SQL injection in login to Red team
+== finding.ownership_changed detail summary
+Synapse: finding ownership changed: SQL injection in login to Red team
+== fleet.agent.offline signal summary
+Synapse: fleet agent unknown offline since 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline summary summary
+Synapse: fleet agent node\-42 offline since 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline detail summary
+Synapse: fleet agent node\-42 offline since 2026\-09\-27 07\:45 UTC
+== incident.created signal summary
+Synapse: High incident
+== incident.created summary summary
+Synapse: High incident: Example title
+== incident.created detail summary
+Synapse: High incident: Example title on db\-primary
+== quality_gate.failed signal summary
+Synapse: quality gate failed (2 conditions)
+== quality_gate.failed summary summary
+Synapse: quality gate failed for Payments (2 conditions)
+== quality_gate.failed detail summary
+Synapse: quality gate failed for Payments (2 conditions)
+== scan.completed signal summary
+Synapse: sast scan completed
+== scan.completed summary summary
+Synapse: sast scan completed for Q3 audit
+== scan.completed detail summary
+Synapse: sast scan completed for Q3 audit
+== sla.approaching_deadline signal summary
+Synapse: high finding due 2026\-09\-28 08\:00 UTC
+== sla.approaching_deadline summary summary
+Synapse: high finding due 2026\-09\-28 08\:00 UTC: SQL injection in login
+== sla.approaching_deadline detail summary
+Synapse: high finding due 2026\-09\-28 08\:00 UTC: SQL injection in login
+== vulnerability_action.created signal summary
+Synapse: High risk action (escalation)
+== vulnerability_action.created summary summary
+Synapse: High risk action (escalation) in Q3 audit
+== vulnerability_action.created detail summary
+Synapse: High risk action (escalation) in Q3 audit
+== notification.channel_paused signal summary
+Synapse: Channel paused at 2026\-09\-27 08\:00 UTC
+== notification.channel_paused summary summary
+Synapse: Example title at 2026\-09\-27 08\:00 UTC
+== notification.channel_paused detail summary
+Synapse: Example title at 2026\-09\-27 08\:00 UTC

@@ -1,0 +1,16 @@
+== * body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}"}
+== vulnerability_action.created body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}", "severity": "{{.severity}}", "action_type": "{{.action_type}}", "engagement_name": "{{.engagement_name}}"}
+== scan.completed body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}", "scan_kind": "{{.scan_kind}}", "target": "{{.target}}", "engagement_name": "{{.engagement_name}}"}
+== quality_gate.failed body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}", "failed_conditions": "{{.failed_conditions}}", "project_name": "{{.project_name}}"}
+== sla.approaching_deadline body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}", "tier": "{{.tier}}", "deadline": "{{.deadline}}", "lead_time_hours": "{{.lead_time_hours}}", "engagement_name": "{{.engagement_name}}", "finding_title": "{{.finding_title}}"}
+== fleet.agent.offline body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}", "last_seen_at": "{{.last_seen_at}}", "agent_name": "{{.agent_name}}"}
+== incident.created body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}", "severity": "{{.severity}}", "engagement_name": "{{.engagement_name}}", "asset_name": "{{.asset_name}}"}
+== finding.ownership_changed body
+{"schema": "synapse.notification.v1", "event_type": "{{.event_type}}", "event_label": "{{.event_label}}", "occurred_at": "{{.occurred_at}}", "title": "{{.title}}", "summary": "{{.summary}}", "engagement_name": "{{.engagement_name}}", "finding_title": "{{.finding_title}}", "old_team": "{{.old_team}}", "new_team": "{{.new_team}}", "old_assignee": "{{.old_assignee}}", "new_assignee": "{{.new_assignee}}", "actor": "{{.actor}}", "reason": "{{.reason}}"}

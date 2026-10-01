@@ -1615,6 +1615,14 @@ func main() {
 		notificationService.SetTransactionRunner(postgres.NewTenantTransactionRunner(databasePool))
 		notificationService.SetDisabledChannelTypes(disabledNotificationTypes)
 		notificationService.SetTemplateStore(postgres.NewNotificationTemplateStore(databasePool))
+		// The shipped templates (#1366) serve the template library and resolution previews. The worker
+		// does not render with them yet: switching delivery to the built-ins is #1367.
+		builtinTemplates, builtinErr := notificationuc.NewBuiltinTemplates()
+		if builtinErr != nil {
+			log.Error("built-in notification templates failed to load", "err", builtinErr)
+			os.Exit(1)
+		}
+		notificationService.SetBuiltinTemplates(builtinTemplates)
 		// Template resolution (#1371) reads the tenant default_locale; the built-in tier stays the
 		// empty catalog until #1366 ships built-in templates.
 		notificationService.SetTenantSettings(tenantSettingsStore)

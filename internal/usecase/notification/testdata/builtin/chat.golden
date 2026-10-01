@@ -1,0 +1,180 @@
+== finding.ownership_changed signal body
+A finding's team or assignee changed.
+
+- When: 2026\-09\-27 08\:00 UTC
+== finding.ownership_changed signal title
+Finding ownership changed
+== finding.ownership_changed summary body
+A finding's team or assignee changed.
+
+- Finding: SQL injection in login
+- Team: Blue team → Red team
+- Assignee: An Nguyen → Binh Tran
+- Changed by: actor\-7
+- Reason: routing rule
+- When: 2026\-09\-27 08\:00 UTC
+== finding.ownership_changed summary title
+Finding ownership changed: SQL injection in login
+== finding.ownership_changed detail body
+A finding's team or assignee changed.
+
+- Finding: SQL injection in login
+- Team: Blue team → Red team
+- Assignee: An Nguyen → Binh Tran
+- Changed by: actor\-7
+- Reason: routing rule
+- When: 2026\-09\-27 08\:00 UTC
+== finding.ownership_changed detail title
+Finding ownership changed: SQL injection in login
+== fleet.agent.offline signal body
+A fleet agent missed its heartbeat window.
+
+- Last seen: 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline signal title
+Fleet agent offline
+== fleet.agent.offline summary body
+A fleet agent missed its heartbeat window.
+
+- Agent: node\-42
+- Last seen: 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline summary title
+Fleet agent offline: node\-42
+== fleet.agent.offline detail body
+A fleet agent missed its heartbeat window.
+
+- Agent: node\-42
+- Last seen: 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline detail title
+Fleet agent offline: node\-42
+== incident.created signal body
+Fleet correlation opened a security incident.
+
+- Opened: 2026\-09\-27 08\:00 UTC
+== incident.created signal title
+[High] Security incident created
+== incident.created summary body
+Fleet correlation opened a security incident.
+
+- Engagement: Q3 audit
+- Opened: 2026\-09\-27 08\:00 UTC
+== incident.created summary title
+[High] Example title
+== incident.created detail body
+Fleet correlation opened a security incident.
+
+- Asset: db\-primary
+- Engagement: Q3 audit
+- Opened: 2026\-09\-27 08\:00 UTC
+== incident.created detail title
+[High] Example title
+== quality_gate.failed signal body
+A project analysis failed its quality gate.
+
+- Failed conditions: 2
+- Analysed: 2026\-09\-27 08\:00 UTC
+== quality_gate.failed signal title
+Quality gate failed
+== quality_gate.failed summary body
+A project analysis failed its quality gate.
+
+- Failed conditions: 2
+- Project: Payments
+- Analysed: 2026\-09\-27 08\:00 UTC
+== quality_gate.failed summary title
+Quality gate failed: Payments
+== quality_gate.failed detail body
+A project analysis failed its quality gate.
+
+- Failed conditions: 2
+- Project: Payments
+- Analysed: 2026\-09\-27 08\:00 UTC
+== quality_gate.failed detail title
+Quality gate failed: Payments
+== scan.completed signal body
+A sast scan finished.
+
+- Finished: 2026\-09\-27 08\:00 UTC
+== scan.completed signal title
+Scan completed
+== scan.completed summary body
+A sast scan finished.
+
+- Target: https\:\/\/git\.example\.test\/org\/repo\.git
+- Engagement: Q3 audit
+- Finished: 2026\-09\-27 08\:00 UTC
+== scan.completed summary title
+Scan completed: Q3 audit
+== scan.completed detail body
+A sast scan finished.
+
+- Target: https\:\/\/git\.example\.test\/org\/repo\.git
+- Engagement: Q3 audit
+- Finished: 2026\-09\-27 08\:00 UTC
+== scan.completed detail title
+Scan completed: Q3 audit
+== sla.approaching_deadline signal body
+A high finding is approaching its remediation deadline.
+
+- Deadline: 2026\-09\-28 08\:00 UTC (reminder 24 h ahead)
+== sla.approaching_deadline signal title
+Remediation SLA due 2026\-09\-28 08\:00 UTC
+== sla.approaching_deadline summary body
+A high finding is approaching its remediation deadline.
+
+- Finding: SQL injection in login
+- Engagement: Q3 audit
+- Deadline: 2026\-09\-28 08\:00 UTC (reminder 24 h ahead)
+== sla.approaching_deadline summary title
+Remediation SLA due 2026\-09\-28 08\:00 UTC: SQL injection in login
+== sla.approaching_deadline detail body
+A high finding is approaching its remediation deadline.
+
+- Finding: SQL injection in login
+- Engagement: Q3 audit
+- Deadline: 2026\-09\-28 08\:00 UTC (reminder 24 h ahead)
+== sla.approaching_deadline detail title
+Remediation SLA due 2026\-09\-28 08\:00 UTC: SQL injection in login
+== vulnerability_action.created signal body
+A vulnerability risk action needs review.
+
+- Action: escalation
+- Raised: 2026\-09\-27 08\:00 UTC
+== vulnerability_action.created signal title
+[High] Vulnerability risk action
+== vulnerability_action.created summary body
+A vulnerability risk action needs review.
+
+- Action: escalation
+- Engagement: Q3 audit
+- Raised: 2026\-09\-27 08\:00 UTC
+== vulnerability_action.created summary title
+[High] Example title
+== vulnerability_action.created detail body
+A vulnerability risk action needs review.
+
+- Action: escalation
+- Engagement: Q3 audit
+- Raised: 2026\-09\-27 08\:00 UTC
+== vulnerability_action.created detail title
+[High] Example title
+== notification.channel_paused signal body
+A Channel paused event occurred.
+
+- Event: notification\.channel\_paused
+- When: 2026\-09\-27 08\:00 UTC
+== notification.channel_paused signal title
+Channel paused
+== notification.channel_paused summary body
+Example summary\.
+
+- Event: notification\.channel\_paused
+- When: 2026\-09\-27 08\:00 UTC
+== notification.channel_paused summary title
+Example title
+== notification.channel_paused detail body
+Example summary\.
+
+- Event: notification\.channel\_paused
+- When: 2026\-09\-27 08\:00 UTC
+== notification.channel_paused detail title
+Example title
