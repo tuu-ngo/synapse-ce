@@ -25,7 +25,11 @@ import (
 const (
 	// refFallback marks a delivery that renders the channel driver's built-in content: no template
 	// applies, or the one that did failed to render.
-	refFallback  = "fallback"
+	refFallback = "fallback"
+	// refEnvelope and refRawEvent are the two built-in webhook bodies (#1367), recorded so delivery
+	// history shows which one a receiver got.
+	refEnvelope  = "webhook:envelope@v1"
+	refRawEvent  = "webhook:raw"
 	refTenantTag = "tenant:"
 	refDraftTag  = "draft:"
 	// maxRenderedRunes bounds one rendered field; channel formatters apply their own, tighter limits.
@@ -59,6 +63,8 @@ type RenderResult struct {
 	Formatted *ports.FormattedMessage
 	// CustomBody is a webhook channel's rendered custom JSON body (#1376).
 	CustomBody []byte
+	// Envelope is a webhook channel's class-filtered envelope (#1367), its default body.
+	Envelope []byte
 	// Fallback reports that a template applied but failed to render, so the built-in content is
 	// sent instead (recorded as template_fallback).
 	Fallback bool
@@ -83,6 +89,9 @@ func (s *Service) RenderMessage(ctx context.Context, in RenderInput) (RenderResu
 		// No catalog entry, so no template schema: the driver's built-in content applies.
 		return RenderResult{Message: ports.RenderedMessage{TemplateRef: refFallback}}, nil
 	}
+	if in.Channel.Type == domain.ChannelWebhook && !in.Channel.CustomBody {
+		return s.renderWebhookDefault(ctx, in, spec, class)
+	}
 	resolution, err := s.renderResolution(ctx, in)
 	if err != nil {
 		return RenderResult{}, err
@@ -105,6 +114,7 @@ func (s *Service) RenderMessage(ctx context.Context, in RenderInput) (RenderResu
 		return fallback(out), nil
 	}
 	out.Message.Fields = rendered
+	out.Message.Links = s.messageLinks(in.Event, resolution.Locale)
 	if formatter, ok := s.formatters[in.Channel.Type]; ok {
 		formatted, err := formatter.Format(out.Message)
 		if err != nil {
@@ -277,6 +287,24 @@ func renderFields(r TemplateResolution, sources map[string]string, vars map[stri
 		out[field] = rendered.Text
 	}
 	return out, nil
+}
+
+// renderWebhookDefault is the body of a webhook channel without a custom body: the raw event for a
+// channel an administrator opted into it, else the class-filtered envelope (#1367). Neither is a
+// template, so neither can fail to render.
+func (s *Service) renderWebhookDefault(ctx context.Context, in RenderInput, spec domain.EventSpec, class domain.DataClass) (RenderResult, error) {
+	if in.Channel.RawEvent {
+		return RenderResult{Message: ports.RenderedMessage{TemplateRef: refRawEvent}}, nil
+	}
+	vars, err := s.renderVars(ctx, in, spec, class, domain.FamilyWebhook)
+	if err != nil {
+		return RenderResult{}, err
+	}
+	envelope, err := domain.NewWebhookEnvelope(in.Event, class, vars)
+	if err != nil {
+		return RenderResult{}, err
+	}
+	return RenderResult{Message: ports.RenderedMessage{TemplateRef: refEnvelope}, Envelope: envelope}, nil
 }
 
 // renderWebhookBody renders a webhook channel's custom body when it opted into one; otherwise the

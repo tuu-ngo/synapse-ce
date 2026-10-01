@@ -29,6 +29,7 @@ import (
 	"github.com/KKloudTarus/synapse-ce/internal/composition/scacompose"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/agent"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/cloudposture"
+	"github.com/KKloudTarus/synapse-ce/internal/domain/consolelink"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/evidence"
 	integrationdom "github.com/KKloudTarus/synapse-ce/internal/domain/integration"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/judgment"
@@ -718,6 +719,22 @@ func main() {
 		notificationService.SetTemplateStore(postgres.NewNotificationTemplateStore(pool))
 		notificationService.SetTenantSettings(postgres.NewTenantSettingsStore(pool))
 		notificationService.SetFormatters(messageformat.Formatters())
+		// Channels render through templates (#1367): the shipped templates back every channel without
+		// a tenant template, and messages link to the console when a public base URL is set.
+		builtinTemplates, builtinErr := notificationuc.NewBuiltinTemplates()
+		if builtinErr != nil {
+			log.Error("built-in notification templates failed to load", "err", builtinErr)
+			os.Exit(1)
+		}
+		notificationService.SetBuiltinTemplates(builtinTemplates)
+		if base := cfg.EffectivePublicBaseURL(); base != "" {
+			links, linkErr := consolelink.NewBuilder(base)
+			if linkErr != nil {
+				log.Error("public base URL is invalid", "err", linkErr)
+				os.Exit(1)
+			}
+			notificationService.SetLinkBuilder(links)
+		}
 		// Delivery metrics are emitted by this worker only: the API exposes
 		// aggregate queue health but never observes worker transport outcomes.
 		if cfg.MetricsEnabled {

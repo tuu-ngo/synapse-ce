@@ -84,6 +84,9 @@ type Channel struct {
 	// DataClass is the most sensitive content the channel's messages may carry (#1360). Empty means
 	// the type's default (DefaultDataClass).
 	DataClass DataClass `json:"data_class"`
+	// RawEvent (webhook channels only, #1367) sends the raw event instead of the class-filtered
+	// envelope. It is an administrator's opt-in and needs the detail class.
+	RawEvent bool `json:"raw_event"`
 	// TemplateBinding is the channel's template and locale (#1371).
 	TemplateBinding
 }
@@ -97,6 +100,9 @@ func (c Channel) Validate() error {
 	}
 	if c.DataClass != "" && !c.DataClass.Valid() {
 		return invalidDataClass()
+	}
+	if c.RawEvent && (c.Type != ChannelWebhook || c.Class() != DataClassDetail || c.CustomBody) {
+		return fmt.Errorf("%w: the raw event body is for webhook channels at the detail class without a custom body", shared.ErrValidation)
 	}
 	return c.TemplateBinding.Validate(c.Type)
 }

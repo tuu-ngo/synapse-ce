@@ -138,7 +138,7 @@ func TestSlackTitleIsBoundedAndEmptyPartsAreOmitted(t *testing.T) {
 		t.Fatalf("header runes %d, texts %v", len([]rune(header)), texts)
 	}
 	empty, _ := Slack{}.Format(ports.RenderedMessage{})
-	if string(empty.Body) != `{"blocks":[],"text":""}` {
+	if string(empty.Body) != `{"blocks":[],"text":"","unfurl_links":false,"unfurl_media":false}` {
 		t.Fatalf("empty message = %s", empty.Body)
 	}
 }

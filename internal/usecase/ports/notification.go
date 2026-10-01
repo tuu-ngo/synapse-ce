@@ -49,6 +49,10 @@ type NotificationWork struct {
 	// When it is not empty the webhook driver sends exactly these bytes instead
 	// of the event envelope, signs them and sets X-Synapse-Body: custom.
 	CustomWebhookBody []byte
+	// WebhookEnvelope is the class-filtered envelope a webhook channel sends by default (#1367).
+	// When it is not empty and there is no custom body, the driver sends these bytes with
+	// X-Synapse-Body: envelope; when both are empty it sends the raw event.
+	WebhookEnvelope []byte
 	// Formatted is the channel's wire payload rendered from a template (#1365). When it is nil the
 	// driver sends its built-in content.
 	Formatted *FormattedMessage
