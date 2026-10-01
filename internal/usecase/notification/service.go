@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/KKloudTarus/synapse-ce/internal/domain/consolelink"
 	domain "github.com/KKloudTarus/synapse-ce/internal/domain/notification"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/privacy"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/shared"
@@ -45,6 +46,8 @@ type Service struct {
 	templates ports.NotificationTemplateStore
 	// builtins is the built-in template catalog (#1366); NoBuiltinTemplates until it ships.
 	builtins ports.BuiltinTemplates
+	// links builds the console deep link of each message (#1367); nil when no public base URL.
+	links *consolelink.Builder
 	// formatters turn rendered content into each channel's wire payload (#1364, #1365).
 	formatters map[domain.ChannelType]ports.NotificationFormatter
 	// events holds the per-type event builders; the worker asks them whether a delivery is still
@@ -138,6 +141,10 @@ type ChannelInput struct {
 	// CustomBody opts a webhook channel into sending its template's body as a custom JSON body
 	// (#1376); it needs a bound template. An absent field keeps the current value.
 	CustomBody *bool `json:"custom_body,omitempty"`
+	// RawEvent opts a webhook channel into the raw event body instead of the envelope (#1367). It
+	// needs the detail class, and turning it on needs AllowClassRaise. An absent field keeps the
+	// current value.
+	RawEvent *bool `json:"raw_event,omitempty"`
 	// DataClass is the channel's data class (#1360); absent keeps the current one, or the type's
 	// default on create.
 	DataClass *domain.DataClass `json:"data_class,omitempty"`
@@ -173,6 +180,9 @@ func (s *Service) createChannel(ctx context.Context, actor string, in ChannelInp
 	}
 	c := domain.Channel{TenantID: tenant, ID: id, Name: strings.TrimSpace(in.Name), Type: in.Type, Enabled: in.Enabled, Destination: destination, Recipients: recipients, Revision: 1, SecretVersion: 1, CreatedAt: now, UpdatedAt: now}
 	if c.DataClass, err = channelDataClass(domain.DefaultDataClass(in.Type), in, true); err != nil {
+		return domain.Channel{}, err
+	}
+	if c.RawEvent, err = channelRawEvent(false, in, true); err != nil {
 		return domain.Channel{}, err
 	}
 	c.TemplateBinding = applyBinding(domain.TemplateBinding{}, in)
@@ -255,6 +265,9 @@ func (s *Service) updateChannel(ctx context.Context, actor string, id shared.ID,
 		return domain.Channel{}, fmt.Errorf("%w: notification channel name is required", shared.ErrValidation)
 	}
 	if updated.DataClass, err = channelDataClass(current.Class(), in, in.AllowClassRaise); err != nil {
+		return domain.Channel{}, err
+	}
+	if updated.RawEvent, err = channelRawEvent(current.RawEvent, in, in.AllowClassRaise); err != nil {
 		return domain.Channel{}, err
 	}
 	updated.TemplateBinding = applyBinding(current.TemplateBinding, in)
@@ -667,7 +680,7 @@ func (s *Service) HandleJob(ctx context.Context, job ports.QueuedJob) error {
 	if err != nil {
 		return err
 	}
-	work.Formatted, work.CustomWebhookBody = render.Formatted, render.CustomBody
+	work.Formatted, work.CustomWebhookBody, work.WebhookEnvelope = render.Formatted, render.CustomBody, render.Envelope
 	now := s.clock.Now().UTC()
 	aid := s.ids.NewID()
 	if _, err = s.repo.BeginAttempt(ctx, job.TenantID, payload.DeliveryID, job.ID, job.Fence, aid, now, render.Message.TemplateRef); err != nil {

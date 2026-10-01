@@ -3,10 +3,12 @@ package notification
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/KKloudTarus/synapse-ce/internal/domain/consolelink"
 	domain "github.com/KKloudTarus/synapse-ce/internal/domain/notification"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/shared"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/messageformat"
@@ -243,5 +245,107 @@ func TestRenderMessageAppliesTheDataClass(t *testing.T) {
 	suppressed, err := h.svc.RenderMessage(h.ctx, RenderInput{Channel: h.channel, Event: projected, Engagement: domain.EngagementNotificationsNone})
 	if err != nil || !suppressed.Suppressed {
 		t.Fatalf("engagement none = %+v, %v", suppressed, err)
+	}
+}
+
+func (h *renderHarness) webhook(t *testing.T, in ChannelInput) domain.Channel {
+	t.Helper()
+	in.Name, in.Type, in.Enabled, in.URL, in.Secret = "Hook", domain.ChannelWebhook, true, "https://hooks.example.test/in", "0123456789abcdef"
+	c, err := h.svc.CreateChannel(h.ctx, "admin", in)
+	if err != nil {
+		t.Fatalf("create webhook: %v", err)
+	}
+	return c
+}
+
+func incidentEvent(t *testing.T, at time.Time) domain.Event {
+	t.Helper()
+	seed, _ := domain.TemplateContext{Vars: map[string]string{"asset_name": "db-primary", "engagement_name": "Q3 audit"}}.Encode()
+	e := domain.Event{TenantID: "tenant-r", ID: "event-i", Type: domain.EventIncidentCreated, SourceKind: "incident", SourceID: "inc-1", SchemaVersion: 1,
+		EngagementID: "eng-1", Severity: "high", OccurredAt: at, Data: json.RawMessage(`{"title":"Suspicious login","incident_id":"inc-1","asset_id":"a1"}`), Context: seed}
+	projected, err := NewEventBuilders().Project(context.Background(), e)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return projected
+}
+
+// TestWebhookDefaultsToTheEnvelope checks the #1367 default body: the class-filtered variables in
+// a versioned envelope, times in RFC 3339 UTC, and nothing above the channel's class.
+func TestWebhookDefaultsToTheEnvelope(t *testing.T) {
+	h := newRenderHarness(t)
+	hook := h.webhook(t, ChannelInput{})
+	out, err := h.svc.RenderMessage(h.ctx, RenderInput{Channel: hook, Event: incidentEvent(t, h.clock.at)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope domain.WebhookEnvelope
+	if err := json.Unmarshal(out.Envelope, &envelope); err != nil {
+		t.Fatalf("envelope %s: %v", out.Envelope, err)
+	}
+	if out.Message.TemplateRef != refEnvelope || envelope.Schema != domain.WebhookEnvelopeSchema || envelope.DataClass != domain.DataClassSummary ||
+		envelope.Subject == nil || envelope.Subject.Kind != "incident" || envelope.EngagementID != "eng-1" {
+		t.Fatalf("envelope = %+v, ref %q", envelope, out.Message.TemplateRef)
+	}
+	if envelope.Variables["title"] != "Suspicious login" || envelope.Variables["engagement_name"] != "Q3 audit" || envelope.Variables["occurred_at"] != "2026-10-01T08:00:00Z" {
+		t.Fatalf("variables = %v", envelope.Variables)
+	}
+	if _, leaked := envelope.Variables["asset_name"]; leaked {
+		t.Fatal("a detail-class variable reached a summary-class webhook")
+	}
+}
+
+// TestRawEventIsAnAdministratorOptIn checks that the raw body needs the detail class and the
+// administer capability, and that a raw channel renders no envelope.
+func TestRawEventIsAnAdministratorOptIn(t *testing.T) {
+	h := newRenderHarness(t)
+	yes := true
+	if _, err := h.svc.CreateChannel(h.ctx, "admin", ChannelInput{Name: "Raw", Type: domain.ChannelWebhook, Enabled: true, URL: "https://hooks.example.test/raw",
+		Secret: "0123456789abcdef", RawEvent: &yes}); !errors.Is(err, shared.ErrValidation) {
+		t.Fatalf("raw at summary = %v, want ErrValidation", err)
+	}
+	raw := h.webhook(t, ChannelInput{RawEvent: &yes, DataClass: classOf(domain.DataClassDetail)})
+	out, err := h.svc.RenderMessage(h.ctx, RenderInput{Channel: raw, Event: incidentEvent(t, h.clock.at)})
+	if err != nil || out.Envelope != nil || out.Message.TemplateRef != refRawEvent {
+		t.Fatalf("raw render = %+v, %v", out, err)
+	}
+
+	hook := h.webhook(t, ChannelInput{DataClass: classOf(domain.DataClassDetail)})
+	enable := ChannelInput{Name: hook.Name, Enabled: true, Revision: hook.Revision, RawEvent: &yes}
+	if _, err := h.svc.UpdateChannel(h.ctx, "integrator", hook.ID, enable); !errors.Is(err, shared.ErrForbidden) {
+		t.Fatalf("enabling raw without administer = %v, want ErrForbidden", err)
+	}
+	enable.AllowClassRaise = true
+	if updated, err := h.svc.UpdateChannel(h.ctx, "admin", hook.ID, enable); err != nil || !updated.RawEvent {
+		t.Fatalf("enabling raw with administer = %+v, %v", updated, err)
+	}
+}
+
+// TestChatMessagesLinkToTheirSubject checks the deep link and the Slack unfurl settings: a message
+// rendered from a built-in links to its subject's console page under the public base URL.
+func TestChatMessagesLinkToTheirSubject(t *testing.T) {
+	h := newRenderHarness(t)
+	builtins, err := NewBuiltinTemplates()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.svc.SetBuiltinTemplates(builtins)
+	links, err := consolelink.NewBuilder("https://synapse.example.test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.svc.SetLinkBuilder(links)
+	out, err := h.svc.RenderMessage(h.ctx, RenderInput{Channel: h.channel, Event: incidentEvent(t, h.clock.at)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Message.Links) != 1 || !strings.HasPrefix(out.Message.Links[0].URL, "https://synapse.example.test/") || !strings.Contains(out.Message.Links[0].URL, "inc-1") {
+		t.Fatalf("links = %+v", out.Message.Links)
+	}
+	if out.Formatted == nil || !strings.Contains(string(out.Formatted.Body), `"unfurl_links":false`) || !strings.Contains(string(out.Formatted.Body), out.Message.Links[0].URL) {
+		t.Fatalf("slack payload = %s", out.Formatted.Body)
+	}
+	if !strings.HasPrefix(out.Message.TemplateRef, "builtin:incident.created:chat:en@") {
+		t.Fatalf("ref = %q, want the built-in", out.Message.TemplateRef)
 	}
 }

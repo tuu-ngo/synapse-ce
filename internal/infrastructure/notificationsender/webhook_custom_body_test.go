@@ -91,13 +91,13 @@ func TestWebhookSendsAndSignsTheCustomBody(t *testing.T) {
 	}
 }
 
-// Without a custom body the envelope is sent unmarked, and its signature covers it.
-func TestWebhookEnvelopeIsNotMarkedCustom(t *testing.T) {
+// Without a custom body or an envelope the raw event is sent unmarked, and its signature covers it.
+func TestWebhookRawEventIsNotMarkedCustom(t *testing.T) {
 	got := captureSend(t, notification.ChannelWebhook, func(url string) ports.NotificationChannelConfig {
 		return ports.WebhookChannelConfig{URL: url, Secret: customBodySecret}
 	})
 	if got.header.Get("X-Synapse-Body") != "" {
-		t.Fatalf("envelope marked as %q", got.header.Get("X-Synapse-Body"))
+		t.Fatalf("raw event marked as %q", got.header.Get("X-Synapse-Body"))
 	}
 	verifySignature(t, got.header, got.body)
 }

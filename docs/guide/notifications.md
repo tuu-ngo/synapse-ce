@@ -301,9 +301,8 @@ UTC.
 
 A built-in is referenced as `builtin:<event>:<family>:<locale>@<build>`, where `<build>`
 changes exactly when the shipped text changes. Template resolution previews show the
-built-in a channel would use. Deliveries do not render with the built-ins yet; until
-channels switch to templates (#1367), a channel without a tenant template keeps its
-current content.
+built-in a channel would use, and every Slack and email delivery without a tenant
+template renders with it.
 
 ### How a message renders
 
@@ -460,7 +459,33 @@ Existing in-flight requests cannot be recalled.
 
 The [versioned event schemas and fixtures](schemas/events/README.md) cover every catalog event type, including operator-only channel tests and destination notices. Each schema validates the complete event envelope and event-specific `data` object. Optional additive fields retain v1; removing or renaming a field requires a new version.
 
-Signed webhooks receive JSON using schema version 1 and these headers:
+A generic webhook channel sends one of three bodies, named by the `X-Synapse-Body` header:
+
+| Body | `X-Synapse-Body` | When |
+| --- | --- | --- |
+| Envelope | `envelope` | The default for new channels |
+| Raw event | absent | `raw_event` is on |
+| Custom | `custom` | `custom_body` is on with a bound webhook template |
+
+The **envelope** is the event's template variables, filtered to the channel's effective
+[data class](#data-classes), in a versioned object described by the
+[envelope schema](schemas/notification-envelope.v1.schema.json):
+
+```json
+{"schema": "synapse.notification.v1", "event_id": "...", "event_type": "scan.completed",
+ "occurred_at": "2026-10-01T08:00:00Z", "data_class": "summary",
+ "subject": {"kind": "scan_job", "id": "..."}, "engagement_id": "...",
+ "variables": {"title": "Scan completed", "scan_kind": "sast", "engagement_name": "Q3 audit"}}
+```
+
+Times in `variables` are RFC 3339 UTC, and a variable without a value is absent. The
+**raw event** is the full event object of the [event schemas](schemas/events/README.md),
+every field included, so turning `raw_event` on needs the `detail` class and the
+`administer` capability, and is audited. Every webhook channel that existed before
+envelopes (migration `0223`) was switched to `raw_event` at `detail`, so its receiver
+sees no change; set `raw_event` to `false` when the receiver reads the envelope.
+
+Every body is signed the same way, with these headers:
 
 ```text
 X-Synapse-Timestamp: <unix seconds>
@@ -475,8 +500,12 @@ request but before success is persisted, so HTTP delivery is at least once rathe
 than exactly once. Redirects and private, loopback, link-local, metadata, and
 DNS-rebound destinations are blocked by the HTTP transport.
 
-Slack uses a fixed Block Kit message and observes Slack's `429 Retry-After`.
-Email creates one delivery per normalized recipient and uses a stable Message-ID.
+Slack and email render through templates: a tenant template when one applies, else the
+built-in one (see [Built-in templates](#built-in-templates)). Slack receives Block Kit
+with `unfurl_links` and `unfurl_media` off, and observes Slack's `429 Retry-After`. When
+`SYNAPSE_PUBLIC_BASE_URL` (or the OIDC frontend URL) is set, each message carries one
+link to its subject's console page: the finding, scan, incident or engagement. Email
+creates one delivery per normalized recipient and uses a stable Message-ID.
 SMTP acceptance means the relay accepted the message; it does not prove inbox delivery.
 
 ## Chat channels: Teams, Telegram, Google Chat and Discord

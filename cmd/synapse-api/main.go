@@ -1615,8 +1615,8 @@ func main() {
 		notificationService.SetTransactionRunner(postgres.NewTenantTransactionRunner(databasePool))
 		notificationService.SetDisabledChannelTypes(disabledNotificationTypes)
 		notificationService.SetTemplateStore(postgres.NewNotificationTemplateStore(databasePool))
-		// The shipped templates (#1366) serve the template library and resolution previews. The worker
-		// does not render with them yet: switching delivery to the built-ins is #1367.
+		// The shipped templates (#1366) serve the template library and resolution previews; the worker
+		// renders deliveries with them (#1367).
 		builtinTemplates, builtinErr := notificationuc.NewBuiltinTemplates()
 		if builtinErr != nil {
 			log.Error("built-in notification templates failed to load", "err", builtinErr)

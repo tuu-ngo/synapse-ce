@@ -13361,6 +13361,12 @@ components:
             Webhook channels only (#1376): send the body of the resolved webhook template as a custom
             JSON body instead of the event envelope, with `X-Synapse-Body: custom`; the signature covers
             the body as sent. Needs a bound template whose body still validates; omitted keeps the value.
+        raw_event:
+          type: boolean
+          description: >-
+            Webhook channels only (#1367): send the raw event instead of the class-filtered
+            synapse.notification.v1 envelope. Needs data_class detail and no custom_body; turning it
+            on needs administer and is audited. Omitted keeps the current value.
         data_class:
           $ref: '#/components/schemas/NotificationDataClass'
           description: >-
@@ -13387,6 +13393,7 @@ components:
         locale: {type: string, enum: [en, vi], description: The channel locale; absent when the tenant default applies}
         custom_body: {type: boolean, description: The webhook channel sends its template body as a custom JSON body (#1376)}
         data_class: {$ref: '#/components/schemas/NotificationDataClass'}
+        raw_event: {type: boolean, description: 'The webhook channel sends the raw event instead of the envelope (#1367)'}
 
     NotificationEngagementSetting:
       type: object
