@@ -255,6 +255,23 @@ feature lands. Saving a template does not yet warn about bound channels whose
 data class is below a variable the template uses (see
 [Data classes](#data-classes)); such a variable renders empty on that channel.
 
+### Built-in templates
+
+Synapse ships a template for every rule-routed event type in each family (chat, email,
+pager, webhook), in English and Vietnamese, plus a generic `*` template per family for
+other event types. They are written in the same template language as tenant templates,
+so a tenant can copy one as the starting point of its own. Each reads well at `signal`:
+the headline never depends on a summary-class variable, and names, titles and assets
+appear only when the channel's class allows them. The webhook built-ins send the
+filtered variables in a `synapse.notification.v1` JSON object, with times in RFC 3339
+UTC.
+
+A built-in is referenced as `builtin:<event>:<family>:<locale>@<build>`, where `<build>`
+changes exactly when the shipped text changes. Template resolution previews show the
+built-in a channel would use. Deliveries do not render with the built-ins yet; until
+channels switch to templates (#1367), a channel without a tenant template keeps its
+current content.
+
 ### How a message renders
 
 The worker renders a delivery when it sends it, not when the event is recorded:

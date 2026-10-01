@@ -1,0 +1,72 @@
+== * title
+{{if .title}}{{.title}}{{else}}{{.event_label}}{{end}}
+== * body
+{{if .summary}}{{.summary}}{{else}}Có sự kiện {{.event_label}}.{{end}}
+
+- Sự kiện: {{.event_type}}
+- Thời điểm: {{.occurred_at}}
+
+== vulnerability_action.created title
+{{if .severity}}[{{upper .severity}}] {{end}}{{if .title}}{{.title}}{{else}}Hành động xử lý rủi ro lỗ hổng{{end}}
+== vulnerability_action.created body
+Có một hành động xử lý rủi ro lỗ hổng cần xem xét.
+
+- Hành động: {{default "xem xét" .action_type}}
+{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Thời điểm: {{.occurred_at}}
+
+== scan.completed title
+Đã quét xong{{if .engagement_name}}: {{.engagement_name}}{{end}}
+== scan.completed body
+Một lượt quét {{default "bảo mật" .scan_kind}} đã hoàn tất.
+
+{{if .target}}- Mục tiêu: {{.target}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Hoàn tất lúc: {{.occurred_at}}
+
+== quality_gate.failed title
+Không đạt quality gate{{if .project_name}}: {{.project_name}}{{end}}
+== quality_gate.failed body
+Một lượt phân tích dự án không đạt quality gate.
+
+{{if .failed_conditions}}- Số điều kiện không đạt: {{.failed_conditions}}
+{{end}}{{if .project_name}}- Dự án: {{.project_name}}
+{{end}}- Phân tích lúc: {{.occurred_at}}
+
+== sla.approaching_deadline title
+Hạn khắc phục {{.deadline}}{{if .finding_title}}: {{.finding_title}}{{end}}
+== sla.approaching_deadline body
+Một finding mức {{default "đang theo dõi" .tier}} sắp đến hạn khắc phục.
+
+{{if .finding_title}}- Finding: {{.finding_title}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Hạn: {{.deadline}}{{if .lead_time_hours}} (nhắc trước {{.lead_time_hours}} giờ){{end}}
+
+== fleet.agent.offline title
+Agent mất kết nối{{if .agent_name}}: {{.agent_name}}{{end}}
+== fleet.agent.offline body
+Một agent không gửi heartbeat trong khoảng thời gian cho phép.
+
+{{if .agent_name}}- Agent: {{.agent_name}}
+{{end}}- Lần cuối thấy: {{.last_seen_at}}
+
+== incident.created title
+{{if .severity}}[{{upper .severity}}] {{end}}{{if .title}}{{.title}}{{else}}Có sự cố bảo mật mới{{end}}
+== incident.created body
+Hệ thống tương quan đã mở một sự cố bảo mật.
+
+{{if .asset_name}}- Tài sản: {{.asset_name}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Mở lúc: {{.occurred_at}}
+
+== finding.ownership_changed title
+Đổi người phụ trách finding{{if .finding_title}}: {{.finding_title}}{{end}}
+== finding.ownership_changed body
+Nhóm hoặc người phụ trách của một finding đã thay đổi.
+
+{{if .finding_title}}- Finding: {{.finding_title}}
+{{end}}{{if .new_team}}- Nhóm: {{if .old_team}}{{.old_team}} → {{end}}{{.new_team}}
+{{end}}{{if .new_assignee}}- Người phụ trách: {{if .old_assignee}}{{.old_assignee}} → {{end}}{{.new_assignee}}
+{{end}}{{if .actor}}- Người thay đổi: {{.actor}}
+{{end}}{{if .reason}}- Lý do: {{.reason}}
+{{end}}- Thời điểm: {{.occurred_at}}

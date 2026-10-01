@@ -93,7 +93,7 @@ func (s *Service) RenderMessage(ctx context.Context, in RenderInput) (RenderResu
 		out.Message.TemplateRef = refFallback
 		return out, nil
 	}
-	vars, err := s.renderVars(ctx, in, spec, class)
+	vars, err := s.renderVars(ctx, in, spec, class, resolution.Family)
 	if err != nil {
 		return RenderResult{}, err
 	}
@@ -201,14 +201,17 @@ func templateFields(r TemplateResolution) map[string]string {
 	return nil
 }
 
-// renderVars is the snapshot filtered to the effective class, with time variables shown in the
-// tenant's zone.
-func (s *Service) renderVars(ctx context.Context, in RenderInput, spec domain.EventSpec, class domain.DataClass) (map[string]string, error) {
+// renderVars is the snapshot filtered to the effective class. Time variables are shown in the
+// tenant's zone for people; a webhook body is read by machines and keeps RFC 3339 UTC.
+func (s *Service) renderVars(ctx context.Context, in RenderInput, spec domain.EventSpec, class domain.DataClass, family domain.TemplateFamily) (map[string]string, error) {
 	snapshot, err := domain.DecodeTemplateContext(in.Event.Context)
 	if err != nil {
 		return nil, err
 	}
 	vars := snapshot.Filter(spec, class).Vars
+	if family == domain.FamilyWebhook {
+		return vars, nil
+	}
 	location, err := s.tenantLocation(ctx, in.Channel.TenantID)
 	if err != nil {
 		return nil, err
