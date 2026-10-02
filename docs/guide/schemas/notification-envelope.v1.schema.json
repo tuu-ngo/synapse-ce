@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://synapse.kkloudtarus.net/docs/schemas/notification-envelope.v1.schema.json",
+  "title": "Synapse webhook envelope (v1)",
+  "description": "The default body of a generic webhook channel: the event's template variables filtered to the channel's effective data class. Sent with X-Synapse-Body: envelope.",
+  "type": "object",
+  "required": ["schema", "event_id", "event_type", "occurred_at", "data_class", "variables"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "synapse.notification.v1"
+    },
+    "event_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "A catalog event type, for example scan.completed."
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "data_class": {
+      "type": "string",
+      "enum": ["signal", "summary", "detail"],
+      "description": "The class the variables were filtered to: the lower of the channel class and the engagement override."
+    },
+    "subject": {
+      "type": "object",
+      "required": ["kind", "id"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "minLength": 1}
+      }
+    },
+    "engagement_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variables": {
+      "type": "object",
+      "description": "The event type's catalog variables at or below data_class. Every value is a string; times are RFC 3339 UTC. A variable without a value is absent.",
+      "additionalProperties": true
+    }
+  }
+}

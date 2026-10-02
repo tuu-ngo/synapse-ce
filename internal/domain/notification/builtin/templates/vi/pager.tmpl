@@ -1,0 +1,16 @@
+== * summary
+Synapse: {{if .title}}{{.title}}{{else}}{{.event_label}}{{end}} lúc {{.occurred_at}}
+== vulnerability_action.created summary
+Synapse: hành động xử lý rủi ro{{if .severity}} mức {{upper .severity}}{{end}} ({{default "xem xét" .action_type}}){{if .engagement_name}} trong {{.engagement_name}}{{end}}
+== scan.completed summary
+Synapse: đã quét {{default "bảo mật" .scan_kind}} xong{{if .engagement_name}} cho {{.engagement_name}}{{end}}
+== quality_gate.failed summary
+Synapse: không đạt quality gate{{if .project_name}} cho {{.project_name}}{{end}}{{if .failed_conditions}} ({{.failed_conditions}} điều kiện){{end}}
+== sla.approaching_deadline summary
+Synapse: finding mức {{default "đang theo dõi" .tier}} đến hạn {{.deadline}}{{if .finding_title}}: {{.finding_title}}{{end}}
+== fleet.agent.offline summary
+Synapse: agent {{default "không rõ tên" .agent_name}} mất kết nối từ {{.last_seen_at}}
+== incident.created summary
+Synapse: sự cố{{if .severity}} mức {{upper .severity}}{{end}}{{if .title}}: {{.title}}{{end}}{{if .asset_name}} trên {{.asset_name}}{{end}}
+== finding.ownership_changed summary
+Synapse: đổi người phụ trách finding{{if .finding_title}}: {{.finding_title}}{{end}}{{if .new_team}} sang {{.new_team}}{{end}}

@@ -39,13 +39,23 @@ type NotificationSourceFailureFilter struct {
 type NotificationWork struct {
 	Delivery notification.Delivery
 	Event    notification.Event
-	Channel  notification.Channel
-	Sealed   string
+	// Engagement is the event's engagement override (#1360); inherit when the event has no
+	// engagement or the engagement stores none.
+	Engagement notification.EngagementNotifications
+	Channel    notification.Channel
+	Sealed     string
 	// CustomWebhookBody is a rendered custom JSON body for a webhook channel that opted into one
-	// (#1376). The send-time renderer (#1365) sets it with notification.RenderCustomWebhookBody;
-	// nothing sets it yet. When it is not empty the webhook driver sends exactly these bytes instead
+	// (#1376). The send-time renderer (#1365) sets it with notification.RenderCustomWebhookBody.
+	// When it is not empty the webhook driver sends exactly these bytes instead
 	// of the event envelope, signs them and sets X-Synapse-Body: custom.
 	CustomWebhookBody []byte
+	// WebhookEnvelope is the class-filtered envelope a webhook channel sends by default (#1367).
+	// When it is not empty and there is no custom body, the driver sends these bytes with
+	// X-Synapse-Body: envelope; when both are empty it sends the raw event.
+	WebhookEnvelope []byte
+	// Formatted is the channel's wire payload rendered from a template (#1365). When it is nil the
+	// driver sends its built-in content.
+	Formatted *FormattedMessage
 }
 
 type NotificationSendResult struct {
@@ -102,7 +112,16 @@ type NotificationRepository interface {
 	ListAttempts(context.Context, shared.ID, shared.ID) ([]notification.Attempt, error)
 	LoadWork(context.Context, shared.ID, shared.ID) (NotificationWork, error)
 	NotificationRelevance
-	BeginAttempt(context.Context, shared.ID, shared.ID, string, int64, shared.ID, time.Time) (notification.Attempt, error)
+
+	// GetEngagementNotificationSetting returns an engagement's override, or inherit at revision 0
+	// when none is stored. It reports ErrNotFound for an engagement the tenant does not have.
+	GetEngagementNotificationSetting(ctx context.Context, tenant, engagement shared.ID) (notification.EngagementNotificationSetting, error)
+	// PutEngagementNotificationSetting stores an override whose Revision is the stored one plus one
+	// (1 for the first), and reports ErrConflict when another write got there first.
+	PutEngagementNotificationSetting(ctx context.Context, setting notification.EngagementNotificationSetting) (notification.EngagementNotificationSetting, error)
+	// BeginAttempt starts an attempt that renders with templateRef (#1365) and pins that ref on
+	// the delivery when it has none yet.
+	BeginAttempt(ctx context.Context, tenant, delivery shared.ID, jobID string, fence int64, attempt shared.ID, at time.Time, templateRef string) (notification.Attempt, error)
 	FinishAttempt(context.Context, shared.ID, shared.ID, string, int64, shared.ID, time.Time, string, int, string, *time.Time) error
 	CancelDelivery(context.Context, shared.ID, shared.ID, string, int64, string) error
 	// DeadLetterDelivery reports whether this call durably transitioned a pending

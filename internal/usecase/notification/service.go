@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/KKloudTarus/synapse-ce/internal/domain/consolelink"
 	domain "github.com/KKloudTarus/synapse-ce/internal/domain/notification"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/privacy"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/shared"
@@ -45,6 +46,10 @@ type Service struct {
 	templates ports.NotificationTemplateStore
 	// builtins is the built-in template catalog (#1366); NoBuiltinTemplates until it ships.
 	builtins ports.BuiltinTemplates
+	// links builds the console deep link of each message (#1367); nil when no public base URL.
+	links *consolelink.Builder
+	// formatters turn rendered content into each channel's wire payload (#1364, #1365).
+	formatters map[domain.ChannelType]ports.NotificationFormatter
 	// events holds the per-type event builders; the worker asks them whether a delivery is still
 	// relevant (#1344).
 	events *EventBuilders
@@ -131,6 +136,17 @@ type ChannelInput struct {
 	// CustomBody opts a webhook channel into sending its template's body as a custom JSON body
 	// (#1376); it needs a bound template. An absent field keeps the current value.
 	CustomBody *bool `json:"custom_body,omitempty"`
+	// RawEvent opts a webhook channel into the raw event body instead of the envelope (#1367). It
+	// needs the detail class, and turning it on needs AllowClassRaise. An absent field keeps the
+	// current value.
+	RawEvent *bool `json:"raw_event,omitempty"`
+	// DataClass is the channel's data class (#1360); absent keeps the current one, or the type's
+	// default on create.
+	DataClass *domain.DataClass `json:"data_class,omitempty"`
+	// AllowClassRaise is set by the caller, never decoded: true only when the principal holds
+	// PermAdminister. Without it an update that raises the data class is refused with
+	// shared.ErrForbidden.
+	AllowClassRaise bool `json:"-"`
 }
 
 func (s *Service) createChannel(ctx context.Context, actor string, in ChannelInput) (domain.Channel, error) {
@@ -158,6 +174,12 @@ func (s *Service) createChannel(ctx context.Context, actor string, in ChannelInp
 		return domain.Channel{}, err
 	}
 	c := domain.Channel{TenantID: tenant, ID: id, Name: strings.TrimSpace(in.Name), Type: in.Type, Enabled: in.Enabled, Destination: destination, Recipients: recipients, Revision: 1, SecretVersion: 1, CreatedAt: now, UpdatedAt: now}
+	if c.DataClass, err = channelDataClass(domain.DefaultDataClass(in.Type), in, true); err != nil {
+		return domain.Channel{}, err
+	}
+	if c.RawEvent, err = channelRawEvent(false, in, true); err != nil {
+		return domain.Channel{}, err
+	}
 	c.TemplateBinding = applyBinding(domain.TemplateBinding{}, in)
 	if err := s.validateBinding(ctx, tenant, c, nil); err != nil {
 		return domain.Channel{}, err
@@ -237,6 +259,12 @@ func (s *Service) updateChannel(ctx context.Context, actor string, id shared.ID,
 	if updated.Name == "" {
 		return domain.Channel{}, fmt.Errorf("%w: notification channel name is required", shared.ErrValidation)
 	}
+	if updated.DataClass, err = channelDataClass(current.Class(), in, in.AllowClassRaise); err != nil {
+		return domain.Channel{}, err
+	}
+	if updated.RawEvent, err = channelRawEvent(current.RawEvent, in, in.AllowClassRaise); err != nil {
+		return domain.Channel{}, err
+	}
 	updated.TemplateBinding = applyBinding(current.TemplateBinding, in)
 	// An unchanged binding is not revalidated, so a channel whose template was archived can still
 	// be renamed or switched off; resolution already skips that binding.
@@ -254,6 +282,9 @@ func (s *Service) updateChannel(ctx context.Context, actor string, id shared.ID,
 		return domain.Channel{}, err
 	}
 	extra := bindingAuditMetadata(current.TemplateBinding, updated.TemplateBinding, map[string]string{"destination_changed": "false"})
+	if updated.Class() != current.Class() {
+		extra["previous_data_class"] = string(current.Class())
+	}
 	if previous := auditDestination(current); replace || !sameRecipients(current.Recipients, updated.Recipients) {
 		extra["destination_changed"] = "true"
 		extra["previous_destination"] = previous
@@ -626,6 +657,10 @@ func (s *Service) HandleJob(ctx context.Context, job ports.QueuedJob) error {
 		// No new sends to a paused channel: its queued work is cancelled like a disabled channel's.
 		return s.repo.CancelDelivery(ctx, job.TenantID, payload.DeliveryID, job.ID, job.Fence, "channel_paused")
 	}
+	// The engagement keeps its notifications inside Synapse (#1360): nothing about it is sent.
+	if _, deliver := domain.EffectiveDataClass(work.Channel.Class(), work.Engagement); !deliver {
+		return s.repo.CancelDelivery(ctx, job.TenantID, payload.DeliveryID, job.ID, job.Fence, codeEngagementSuppressed)
+	}
 	relevant, err := s.events.StillRelevant(ctx, s.repo, work)
 	if err != nil {
 		return err
@@ -633,9 +668,15 @@ func (s *Service) HandleJob(ctx context.Context, job ports.QueuedJob) error {
 	if !relevant {
 		return s.repo.CancelDelivery(ctx, job.TenantID, payload.DeliveryID, job.ID, job.Fence, "source_no_longer_relevant")
 	}
+	// Render before the attempt starts: a retry reuses the template the first attempt pinned.
+	render, err := s.RenderMessage(ctx, RenderInput{Channel: work.Channel, Event: work.Event, Engagement: work.Engagement, Pin: work.Delivery.TemplateRef})
+	if err != nil {
+		return err
+	}
+	work.Formatted, work.CustomWebhookBody, work.WebhookEnvelope = render.Formatted, render.CustomBody, render.Envelope
 	now := s.clock.Now().UTC()
 	aid := s.ids.NewID()
-	if _, err = s.repo.BeginAttempt(ctx, job.TenantID, payload.DeliveryID, job.ID, job.Fence, aid, now); err != nil {
+	if _, err = s.repo.BeginAttempt(ctx, job.TenantID, payload.DeliveryID, job.ID, job.Fence, aid, now, render.Message.TemplateRef); err != nil {
 		return err
 	}
 	attempt := finishedAttempt{job: job, work: work, deliveryID: payload.DeliveryID, attemptID: aid}
@@ -661,6 +702,7 @@ func (s *Service) HandleJob(ctx context.Context, job ports.QueuedJob) error {
 		return &DeliveryError{terminal: true, cause: errors.New(configErr)}
 	}
 	result := s.sender.Send(ctx, work, cfg)
+	result.TemplateFallback = result.TemplateFallback || render.Fallback
 	finished := s.clock.Now().UTC()
 	if result.ErrorCode == "" && result.StatusCode >= 200 && result.StatusCode < 300 {
 		if err = s.finishAttempt(ctx, attempt, finished, "delivered", result.StatusCode, "", nil, domain.AttemptDelivered); err != nil {

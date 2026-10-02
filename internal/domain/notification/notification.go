@@ -81,6 +81,12 @@ type Channel struct {
 	DeletedAt     *time.Time  `json:"deleted_at,omitempty"`
 	// Health is maintained by the delivery worker (#1464); administrators change it only by resuming.
 	Health ChannelHealth `json:"health"`
+	// DataClass is the most sensitive content the channel's messages may carry (#1360). Empty means
+	// the type's default (DefaultDataClass).
+	DataClass DataClass `json:"data_class"`
+	// RawEvent (webhook channels only, #1367) sends the raw event instead of the class-filtered
+	// envelope. It is an administrator's opt-in and needs the detail class.
+	RawEvent bool `json:"raw_event"`
 	// TemplateBinding is the channel's template and locale (#1371).
 	TemplateBinding
 }
@@ -91,6 +97,12 @@ func (c Channel) Validate() error {
 	}
 	if c.Type == ChannelEmail && len(c.Recipients) == 0 {
 		return fmt.Errorf("%w: email channel requires recipients", shared.ErrValidation)
+	}
+	if c.DataClass != "" && !c.DataClass.Valid() {
+		return invalidDataClass()
+	}
+	if c.RawEvent && (c.Type != ChannelWebhook || c.Class() != DataClassDetail || c.CustomBody) {
+		return fmt.Errorf("%w: the raw event body is for webhook channels at the detail class without a custom body", shared.ErrValidation)
 	}
 	return c.TemplateBinding.Validate(c.Type)
 }
@@ -271,6 +283,8 @@ type Delivery struct {
 	DeliveredAt    *time.Time    `json:"delivered_at,omitempty"`
 	CreatedAt      time.Time     `json:"created_at"`
 	UpdatedAt      time.Time     `json:"updated_at"`
+	// TemplateRef is the template pinned by the first attempt (#1365); retries render with it.
+	TemplateRef string `json:"template_ref,omitempty"`
 }
 
 type Attempt struct {
@@ -282,6 +296,8 @@ type Attempt struct {
 	Outcome      string     `json:"outcome"`
 	ResponseCode int        `json:"response_code,omitempty"`
 	ErrorCode    string     `json:"error_code,omitempty"`
+	// TemplateRef is the template this attempt rendered with (#1365).
+	TemplateRef string `json:"template_ref,omitempty"`
 }
 
 type Page struct {
@@ -362,4 +378,12 @@ func validActionType(v string) bool {
 		}
 	}
 	return false
+}
+
+// Class is the channel's data class, or its type's default when none was set.
+func (c Channel) Class() DataClass {
+	if c.DataClass.Valid() {
+		return c.DataClass
+	}
+	return DefaultDataClass(c.Type)
 }

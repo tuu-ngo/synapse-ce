@@ -51,7 +51,8 @@ func (r *NotificationRepository) CreateChannel(ctx context.Context, c notificati
 		}
 		recipients, _ := json.Marshal(c.Recipients)
 		c.Health = notification.ChannelHealth{State: notification.ChannelActive}
-		if _, err := tx.Exec(ctx, `INSERT INTO notification_channels(tenant_id,id,name,channel_type,enabled,destination,recipients,revision,secret_version,created_at,updated_at,template_id,locale,custom_body) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,''),NULLIF($13,''),$14)`, c.TenantID, c.ID, c.Name, c.Type, c.Enabled, c.Destination, recipients, c.Revision, c.SecretVersion, c.CreatedAt, c.UpdatedAt, c.TemplateID, c.Locale, c.CustomBody); err != nil {
+		c.DataClass = c.Class()
+		if _, err := tx.Exec(ctx, `INSERT INTO notification_channels(tenant_id,id,name,channel_type,enabled,destination,recipients,revision,secret_version,created_at,updated_at,template_id,locale,custom_body,data_class,raw_event) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,NULLIF($12,''),NULLIF($13,''),$14,$15,$16)`, c.TenantID, c.ID, c.Name, c.Type, c.Enabled, c.Destination, recipients, c.Revision, c.SecretVersion, c.CreatedAt, c.UpdatedAt, c.TemplateID, c.Locale, c.CustomBody, c.DataClass, c.RawEvent); err != nil {
 			return fmt.Errorf("insert notification channel: %w", err)
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO notification_channel_versions(tenant_id,channel_id,version,sealed_config,created_at) VALUES($1,$2,$3,$4,$5)`, c.TenantID, c.ID, c.SecretVersion, sealed, c.CreatedAt); err != nil {
@@ -63,6 +64,7 @@ func (r *NotificationRepository) CreateChannel(ctx context.Context, c notificati
 }
 
 func (r *NotificationRepository) UpdateChannel(ctx context.Context, c notification.Channel, sealed string, replace bool) (notification.Channel, error) {
+	c.DataClass = c.Class()
 	if err := c.Validate(); err != nil {
 		return notification.Channel{}, err
 	}
@@ -90,9 +92,9 @@ func (r *NotificationRepository) UpdateChannel(ctx context.Context, c notificati
 		// Health is not configuration: an edit keeps a pause (only resume clears it). A new
 		// destination or secret does reset the failure count of an active channel, because the
 		// failures it counted were against the configuration being replaced.
-		err := scanChannelHealth(tx.QueryRow(ctx, `UPDATE notification_channels SET name=$3,channel_type=$4,enabled=$5,destination=$6,recipients=$7,revision=$8,secret_version=$9,updated_at=$10,template_id=NULLIF($12,''),locale=NULLIF($13,''),custom_body=$14,
+		err := scanChannelHealth(tx.QueryRow(ctx, `UPDATE notification_channels SET name=$3,channel_type=$4,enabled=$5,destination=$6,recipients=$7,revision=$8,secret_version=$9,updated_at=$10,template_id=NULLIF($12,''),locale=NULLIF($13,''),custom_body=$14,data_class=$15,raw_event=$16,
 			consecutive_permanent_failures=CASE WHEN $11 AND paused_at IS NULL THEN 0 ELSE consecutive_permanent_failures END
-			WHERE tenant_id=$1 AND id=$2 RETURNING `+channelHealthColumns, c.TenantID, c.ID, c.Name, c.Type, c.Enabled, c.Destination, recipients, c.Revision, c.SecretVersion, c.UpdatedAt, replace, c.TemplateID, c.Locale, c.CustomBody), &c.Health)
+			WHERE tenant_id=$1 AND id=$2 RETURNING `+channelHealthColumns, c.TenantID, c.ID, c.Name, c.Type, c.Enabled, c.Destination, recipients, c.Revision, c.SecretVersion, c.UpdatedAt, replace, c.TemplateID, c.Locale, c.CustomBody, c.DataClass, c.RawEvent), &c.Health)
 		// channel_disabled takes priority: a delivery already cancelled for it needs no second,
 		// redundant UPDATE for a destination or secret change made in the same call.
 		//
@@ -170,8 +172,9 @@ func (r *NotificationRepository) ListChannels(ctx context.Context, tenant shared
 
 const channelSelect = `SELECT tenant_id,id,name,channel_type,enabled,destination,recipients,revision,secret_version,created_at,updated_at,deleted_at,` + channelHealthColumns + `,` + channelBindingColumns + ` FROM notification_channels`
 
-// channelBindingColumns is the template binding projection (migrations 0200 and 0201).
-const channelBindingColumns = `COALESCE(template_id,''),COALESCE(locale,''),custom_body`
+// channelBindingColumns is the template binding projection (migrations 0200 and 0201) and the
+// data class (#1360).
+const channelBindingColumns = `COALESCE(template_id,''),COALESCE(locale,''),custom_body,data_class,raw_event`
 
 // channelHealthColumns is the health projection scanned by scanChannelHealth (migration 0196).
 const channelHealthColumns = `consecutive_permanent_failures,last_failure_code,last_failure_at,paused_at,COALESCE(paused_reason,'')`
@@ -179,7 +182,7 @@ const channelHealthColumns = `consecutive_permanent_failures,last_failure_code,l
 func scanChannel(row scanner, c *notification.Channel) error {
 	var recipients []byte
 	var typ string
-	if err := row.Scan(&c.TenantID, &c.ID, &c.Name, &typ, &c.Enabled, &c.Destination, &recipients, &c.Revision, &c.SecretVersion, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt, &c.Health.ConsecutiveFailures, &c.Health.LastFailureCode, &c.Health.LastFailureAt, &c.Health.PausedAt, &c.Health.PausedReason, &c.TemplateID, &c.Locale, &c.CustomBody); err != nil {
+	if err := row.Scan(&c.TenantID, &c.ID, &c.Name, &typ, &c.Enabled, &c.Destination, &recipients, &c.Revision, &c.SecretVersion, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt, &c.Health.ConsecutiveFailures, &c.Health.LastFailureCode, &c.Health.LastFailureAt, &c.Health.PausedAt, &c.Health.PausedReason, &c.TemplateID, &c.Locale, &c.CustomBody, &c.DataClass, &c.RawEvent); err != nil {
 		return err
 	}
 	c.Type = notification.ChannelType(typ)
@@ -654,14 +657,14 @@ func (r *NotificationRepository) ListSourceFailures(ctx context.Context, f ports
 	return out, err
 }
 
-const deliverySelect = `SELECT d.tenant_id,d.id,d.event_id,d.channel_id,d.channel_type,d.recipient,d.matched_rules,d.state,d.attempts,d.last_error,d.next_attempt_at,d.delivered_at,d.created_at,d.updated_at,
+const deliverySelect = `SELECT d.tenant_id,d.id,d.event_id,d.channel_id,d.channel_type,d.recipient,d.matched_rules,d.state,d.attempts,d.last_error,d.next_attempt_at,d.delivered_at,d.created_at,d.updated_at,d.template_ref,
 COALESCE((SELECT j.claim_fence FROM jobs j WHERE j.tenant_id=d.tenant_id AND j.id='notification-'||d.id AND j.kind='notification.deliver'),0)
 FROM notification_deliveries d`
 
 func scanDelivery(row scanner, d *notification.Delivery) error {
 	var rules []byte
 	var typ, state string
-	if err := row.Scan(&d.TenantID, &d.ID, &d.EventID, &d.ChannelID, &typ, &d.Recipient, &rules, &state, &d.Attempts, &d.LastError, &d.NextAttemptAt, &d.DeliveredAt, &d.CreatedAt, &d.UpdatedAt, &d.RedriveFence); err != nil {
+	if err := row.Scan(&d.TenantID, &d.ID, &d.EventID, &d.ChannelID, &typ, &d.Recipient, &rules, &state, &d.Attempts, &d.LastError, &d.NextAttemptAt, &d.DeliveredAt, &d.CreatedAt, &d.UpdatedAt, &d.TemplateRef, &d.RedriveFence); err != nil {
 		return err
 	}
 	d.ChannelType = notification.ChannelType(typ)
@@ -674,14 +677,14 @@ func (r *NotificationRepository) ListAttempts(ctx context.Context, tenant, did s
 	}
 	var out []notification.Attempt
 	err := WithTenant(ctx, r.pool, tenant.String(), func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT id,delivery_id,attempt_number,started_at,finished_at,outcome,response_code,error_code FROM notification_delivery_attempts WHERE tenant_id=$1 AND delivery_id=$2 ORDER BY attempt_number`, tenant, did)
+		rows, err := tx.Query(ctx, `SELECT id,delivery_id,attempt_number,started_at,finished_at,outcome,response_code,error_code,template_ref FROM notification_delivery_attempts WHERE tenant_id=$1 AND delivery_id=$2 ORDER BY attempt_number`, tenant, did)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
 		for rows.Next() {
 			var a notification.Attempt
-			if err := rows.Scan(&a.ID, &a.DeliveryID, &a.Number, &a.StartedAt, &a.FinishedAt, &a.Outcome, &a.ResponseCode, &a.ErrorCode); err != nil {
+			if err := rows.Scan(&a.ID, &a.DeliveryID, &a.Number, &a.StartedAt, &a.FinishedAt, &a.Outcome, &a.ResponseCode, &a.ErrorCode, &a.TemplateRef); err != nil {
 				return err
 			}
 			out = append(out, a)
@@ -696,7 +699,7 @@ func (r *NotificationRepository) LoadWork(ctx context.Context, tenant, did share
 	var rules, eventData, eventContext, recipients []byte
 	var ctyp, state, etype string
 	err := WithTenant(ctx, r.pool, tenant.String(), func(tx pgx.Tx) error {
-		return tx.QueryRow(ctx, `SELECT d.tenant_id,d.id,d.event_id,d.channel_id,d.channel_type,d.recipient,d.matched_rules,d.state,d.attempts,d.last_error,d.next_attempt_at,d.delivered_at,d.created_at,d.updated_at,e.event_type,e.source_kind,e.source_id,e.engagement_id,e.severity,e.schema_version,e.occurred_at,e.data,e.subject_kind,e.subject_id,e.context,c.name,c.enabled,c.destination,c.recipients,c.revision,d.channel_version,c.created_at,c.updated_at,v.sealed_config,c.consecutive_permanent_failures,c.last_failure_code,c.last_failure_at,c.paused_at,COALESCE(c.paused_reason,''),COALESCE(c.template_id,''),COALESCE(c.locale,''),c.custom_body FROM notification_deliveries d JOIN notification_events e ON e.tenant_id=d.tenant_id AND e.id=d.event_id JOIN notification_channels c ON c.tenant_id=d.tenant_id AND c.id=d.channel_id JOIN notification_channel_versions v ON v.tenant_id=d.tenant_id AND v.channel_id=d.channel_id AND v.version=d.channel_version WHERE d.tenant_id=$1 AND d.id=$2`, tenant, did).Scan(&w.Delivery.TenantID, &w.Delivery.ID, &w.Delivery.EventID, &w.Delivery.ChannelID, &ctyp, &w.Delivery.Recipient, &rules, &state, &w.Delivery.Attempts, &w.Delivery.LastError, &w.Delivery.NextAttemptAt, &w.Delivery.DeliveredAt, &w.Delivery.CreatedAt, &w.Delivery.UpdatedAt, &etype, &w.Event.SourceKind, &w.Event.SourceID, &w.Event.EngagementID, &w.Event.Severity, &w.Event.SchemaVersion, &w.Event.OccurredAt, &eventData, &w.Event.SubjectKind, &w.Event.SubjectID, &eventContext, &w.Channel.Name, &w.Channel.Enabled, &w.Channel.Destination, &recipients, &w.Channel.Revision, &w.Channel.SecretVersion, &w.Channel.CreatedAt, &w.Channel.UpdatedAt, &w.Sealed, &w.Channel.Health.ConsecutiveFailures, &w.Channel.Health.LastFailureCode, &w.Channel.Health.LastFailureAt, &w.Channel.Health.PausedAt, &w.Channel.Health.PausedReason, &w.Channel.TemplateID, &w.Channel.Locale, &w.Channel.CustomBody)
+		return tx.QueryRow(ctx, `SELECT d.tenant_id,d.id,d.event_id,d.channel_id,d.channel_type,d.recipient,d.matched_rules,d.state,d.attempts,d.last_error,d.next_attempt_at,d.delivered_at,d.created_at,d.updated_at,d.template_ref,e.event_type,e.source_kind,e.source_id,e.engagement_id,e.severity,e.schema_version,e.occurred_at,e.data,e.subject_kind,e.subject_id,e.context,c.name,c.enabled,c.destination,c.recipients,c.revision,d.channel_version,c.created_at,c.updated_at,v.sealed_config,c.consecutive_permanent_failures,c.last_failure_code,c.last_failure_at,c.paused_at,COALESCE(c.paused_reason,''),COALESCE(c.template_id,''),COALESCE(c.locale,''),c.custom_body,c.data_class,c.raw_event,COALESCE((SELECT s.external_notifications FROM notification_engagement_settings s WHERE s.tenant_id=d.tenant_id AND s.engagement_id=e.engagement_id),'inherit') FROM notification_deliveries d JOIN notification_events e ON e.tenant_id=d.tenant_id AND e.id=d.event_id JOIN notification_channels c ON c.tenant_id=d.tenant_id AND c.id=d.channel_id JOIN notification_channel_versions v ON v.tenant_id=d.tenant_id AND v.channel_id=d.channel_id AND v.version=d.channel_version WHERE d.tenant_id=$1 AND d.id=$2`, tenant, did).Scan(&w.Delivery.TenantID, &w.Delivery.ID, &w.Delivery.EventID, &w.Delivery.ChannelID, &ctyp, &w.Delivery.Recipient, &rules, &state, &w.Delivery.Attempts, &w.Delivery.LastError, &w.Delivery.NextAttemptAt, &w.Delivery.DeliveredAt, &w.Delivery.CreatedAt, &w.Delivery.UpdatedAt, &w.Delivery.TemplateRef, &etype, &w.Event.SourceKind, &w.Event.SourceID, &w.Event.EngagementID, &w.Event.Severity, &w.Event.SchemaVersion, &w.Event.OccurredAt, &eventData, &w.Event.SubjectKind, &w.Event.SubjectID, &eventContext, &w.Channel.Name, &w.Channel.Enabled, &w.Channel.Destination, &recipients, &w.Channel.Revision, &w.Channel.SecretVersion, &w.Channel.CreatedAt, &w.Channel.UpdatedAt, &w.Sealed, &w.Channel.Health.ConsecutiveFailures, &w.Channel.Health.LastFailureCode, &w.Channel.Health.LastFailureAt, &w.Channel.Health.PausedAt, &w.Channel.Health.PausedReason, &w.Channel.TemplateID, &w.Channel.Locale, &w.Channel.CustomBody, &w.Channel.DataClass, &w.Channel.RawEvent, &w.Engagement)
 	})
 	w.Channel.Health.State = healthState(w.Channel.Health.PausedAt)
 	w.Delivery.ChannelType = notification.ChannelType(ctyp)
@@ -717,7 +720,7 @@ func (r *NotificationRepository) LoadWork(ctx context.Context, tenant, did share
 	return w, err
 }
 
-func (r *NotificationRepository) BeginAttempt(ctx context.Context, tenant, did shared.ID, jobID string, fence int64, aid shared.ID, at time.Time) (notification.Attempt, error) {
+func (r *NotificationRepository) BeginAttempt(ctx context.Context, tenant, did shared.ID, jobID string, fence int64, aid shared.ID, at time.Time, templateRef string) (notification.Attempt, error) {
 	var out notification.Attempt
 	err := WithTenant(ctx, r.pool, tenant.String(), func(tx pgx.Tx) error {
 		var ok int
@@ -760,16 +763,16 @@ func (r *NotificationRepository) BeginAttempt(ctx context.Context, tenant, did s
 		if _, err := tx.Exec(ctx, `UPDATE notification_channels SET last_attempt_at=$3 WHERE tenant_id=$1 AND id=(SELECT channel_id FROM notification_deliveries WHERE tenant_id=$1 AND id=$2)`, tenant, did, at); err != nil {
 			return err
 		}
-		if err := tx.QueryRow(ctx, `UPDATE notification_deliveries SET attempts=attempts+1,updated_at=$3 WHERE tenant_id=$1 AND id=$2 AND state IN ('pending','retrying') RETURNING attempts`, tenant, did, at).Scan(&n); err != nil {
+		if err := tx.QueryRow(ctx, `UPDATE notification_deliveries SET attempts=attempts+1,updated_at=$3,template_ref=CASE WHEN template_ref='' THEN $4 ELSE template_ref END WHERE tenant_id=$1 AND id=$2 AND state IN ('pending','retrying') RETURNING attempts`, tenant, did, at, templateRef).Scan(&n); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return fmt.Errorf("notification delivery is terminal: %w", shared.ErrConflict)
 			}
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO notification_delivery_attempts(tenant_id,id,delivery_id,attempt_number,started_at,outcome) VALUES($1,$2,$3,$4,$5,'started')`, tenant, aid, did, n, at); err != nil {
+		if _, err := tx.Exec(ctx, `INSERT INTO notification_delivery_attempts(tenant_id,id,delivery_id,attempt_number,started_at,outcome,template_ref) VALUES($1,$2,$3,$4,$5,'started',$6)`, tenant, aid, did, n, at, templateRef); err != nil {
 			return err
 		}
-		out = notification.Attempt{ID: aid, DeliveryID: did, Number: n, StartedAt: at, Outcome: "started"}
+		out = notification.Attempt{ID: aid, DeliveryID: did, Number: n, StartedAt: at, Outcome: "started", TemplateRef: templateRef}
 		return nil
 	})
 	return out, err
