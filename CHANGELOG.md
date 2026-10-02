@@ -9,6 +9,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Fixed
 
+- **Secrets are scrubbed from notification variables (#1361).** The event builders run the privacy policy's secret scrubber (`privacy.ScrubSecretPatterns`), then strip URL credentials, over every template variable before the snapshot is stored. A password assignment, bearer token, AWS access key ID, PEM private key or URL credential in a finding title or any other value no longer reaches a message template. The webhook body, which is the raw event, is unchanged.
 - **The SIEM export enumerated the legacy empty tenant.** `SIEMRepository.TenantIDs` listed every `tenants` row, including the empty-id row migration 0002 seeds and every install still carries. Nothing can be exported for it, because `WithTenant` maps an empty id to NULL and RLS denies it, so each tick spent an RLS-denied round trip on it. It is now filtered like the other seven tenant listings in the package.
 - Invalid captured notification sources are quarantined so later sources can be delivered; administrators can inspect safe failure reasons in delivery history.
 
