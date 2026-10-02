@@ -253,9 +253,33 @@ the webhook body has always carried; the trigger keeps writing the data until
 every running worker can compose it. No event declares a list variable yet, so a template
 cannot `range` over one. The `webhook` family's `body` is compiled as text; the
 structured JSON body of a custom webhook is validated separately when that
-feature lands. Channels carry no data class and cannot be bound to a template
-yet, so saving does not yet warn about bound channels whose class is below a
-variable the template uses.
+feature lands. Saving a template does not yet warn about bound channels whose
+data class is below a variable the template uses (see
+[Data classes](#data-classes)); such a variable renders empty on that channel.
+
+### How a message renders
+
+The worker renders a delivery when it sends it, not when the event is recorded:
+
+1. It takes the snapshot stored with the event and keeps only the variables at or below
+   the effective data class (see [Data classes](#data-classes)). Time variables
+   (`occurred_at`, `deadline`, `last_seen_at`) are shown in the tenant's time zone, for
+   example `2026-10-01 15:00 +07`.
+2. On the first attempt it resolves the template (channel binding, tenant template for
+   the event, tenant `*` template, built-in, fallback) and pins it on the delivery as
+   `template_ref`: `tenant:<template>@<version>`, a built-in's
+   `builtin:<event>:<family>:<locale>@<build>`, or `fallback`.
+3. A retry renders with the pinned template, so activating a new version does not
+   change a message halfway through its retries. Every attempt records the
+   `template_ref` it rendered with (`GET .../deliveries/{id}/attempts`).
+4. The rendered fields go through the channel's formatter (Slack Block Kit, email text)
+   and the driver sends that payload. A webhook channel with `custom_body` sends its
+   rendered JSON body; any other webhook sends the event envelope.
+
+If the template no longer renders, for example because it names a variable the
+catalog has since removed, the delivery falls back to the channel's built-in content,
+records `template_ref: fallback`, and is still sent. The worker's built-in content fallback metric (#1465) counts it. A channel with no template that applies sends
+its built-in content as before.
 
 ### Template preview
 
@@ -290,6 +314,44 @@ version's checksum, and a diff summary. The summary lists each changed field as
 `field:+added/-removed`, counting lines added and removed (for example
 `body:+2/-1,title:+1/-0`), or `none`. It never quotes template source.
 
+## Data classes
+
+Every channel has a data class, the most sensitive content its messages may carry:
+
+| Class | Carries |
+| --- | --- |
+| `signal` | The event type, severity, counts and a link |
+| `summary` | Adds titles, engagement, project and finding names, and target hosts |
+| `detail` | Adds advisories, assets, file paths and item lists |
+
+A new chat or pager channel is `signal`, and a new email or webhook channel is `summary`;
+channels that existed before data classes got the same defaults. Set `data_class` on
+`POST` or `PATCH /api/v1/notifications/channels`. Each template variable declares its
+class in the event catalog, and a message renders only the variables at or below the
+class that applies.
+
+An engagement can lower that class for every message about it with
+`PUT /api/v1/notifications/engagements/{id}/settings`:
+
+```json
+{"external_notifications": "signal", "revision": 0}
+```
+
+`inherit` (the default) keeps each channel's class, `signal` caps every channel at
+`signal`, and `none` keeps every notification about the engagement inside Synapse. The
+lower of the channel class and the engagement setting wins. While an engagement is set
+to `none`, its queued deliveries are cancelled with `engagement_suppressed` instead of
+sent. `GET` on the same path returns the setting, `inherit` at revision 0 when none is
+stored. Every change is audited as `notification.engagement_setting.updated` with the
+previous and new values.
+
+Lowering a class or an override needs `manage_integrations`. Raising either one lets
+more data leave Synapse, so it needs `administer` and answers `403` otherwise.
+
+Classes apply to every message rendered from a template: a variable above the class
+renders empty. The built-in webhook envelope and the built-in Slack and email content
+are not filtered by class yet; the engagement `none` setting applies to every delivery.
+
 ## Personal inbox
 
 When notifications are enabled, each human user has an inbox at `/inbox` and a bell in the application header. `GET /api/v1/me/inbox` and `GET /api/v1/me/inbox/unread` are scoped to the signed-in user. Machine roles are denied. The bell polls at most every 30 seconds and pauses while the tab is hidden. A deployment without the inbox returns 404 and the bell stops asking.
@@ -317,13 +379,15 @@ quarantined sources. Actions that point Synapse at a new destination still requi
 | Create, edit or delete a routing rule; read delivery history | yes | yes |
 | Create a channel | no (`403`) | yes |
 | Change a channel's URL, secret or email recipients | no (`403`) | yes |
+| Lower a channel's data class or an engagement's override | yes | yes |
+| Raise a channel's data class or an engagement's override | no (`403`) | yes |
 
 A `PATCH` that sends the channel's current recipients back is not a change. Machine
 roles (`agent`, `mcp`) never hold either permission. Every channel audit entry records
 the actor and the destination masked to `scheme://host` (`mailto://` and the recipient
 domains for email); an update also records `destination_changed` and, when it is
-`true`, the previous masked destination. Channels carry no data class yet, so none is
-recorded.
+`true`, the previous masked destination. Every channel audit entry also records the
+channel's `data_class`, and an update that changes it records `previous_data_class`.
 
 Channel type is immutable. Editing a URL or
 HMAC key creates a new encrypted version; pending deliveries retain their original
