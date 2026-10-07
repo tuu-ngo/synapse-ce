@@ -1,0 +1,16 @@
+== * summary
+Synapse: {{if .title}}{{.title}}{{else}}{{.event_label}}{{end}} at {{.occurred_at}}
+== vulnerability_action.created summary
+Synapse: {{if .severity}}{{severity_label .severity}} {{end}}risk action ({{default "review" .action_type}}){{if .engagement_name}} in {{.engagement_name}}{{end}}
+== scan.completed summary
+Synapse: {{default "security" .scan_kind}} scan completed{{if .engagement_name}} for {{.engagement_name}}{{end}}
+== quality_gate.failed summary
+Synapse: quality gate failed{{if .project_name}} for {{.project_name}}{{end}}{{if .failed_conditions}} ({{.failed_conditions}} {{plural .failed_conditions "condition" "conditions"}}){{end}}
+== sla.approaching_deadline summary
+Synapse: {{default "tracked" .tier}} finding due {{.deadline}}{{if .finding_title}}: {{.finding_title}}{{end}}
+== fleet.agent.offline summary
+Synapse: fleet agent {{default "unknown" .agent_name}} offline since {{.last_seen_at}}
+== incident.created summary
+Synapse: {{if .severity}}{{severity_label .severity}} {{end}}incident{{if .title}}: {{.title}}{{end}}{{if .asset_name}} on {{.asset_name}}{{end}}
+== finding.ownership_changed summary
+Synapse: finding ownership changed{{if .finding_title}}: {{.finding_title}}{{end}}{{if .new_team}} to {{.new_team}}{{end}}

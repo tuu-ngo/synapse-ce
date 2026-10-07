@@ -1,0 +1,48 @@
+== finding.ownership_changed signal body
+{"schema":"synapse.notification.v1","event_type":"finding.ownership_changed","event_label":"Finding ownership changed","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":"","engagement_name":"","finding_title":"","old_team":"","new_team":"","old_assignee":"","new_assignee":"","actor":"","reason":""}
+== finding.ownership_changed summary body
+{"schema":"synapse.notification.v1","event_type":"finding.ownership_changed","event_label":"Finding ownership changed","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","engagement_name":"Q3 audit","finding_title":"SQL injection in login","old_team":"Blue team","new_team":"Red team","old_assignee":"An Nguyen","new_assignee":"Binh Tran","actor":"actor-7","reason":"routing rule"}
+== finding.ownership_changed detail body
+{"schema":"synapse.notification.v1","event_type":"finding.ownership_changed","event_label":"Finding ownership changed","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","engagement_name":"Q3 audit","finding_title":"SQL injection in login","old_team":"Blue team","new_team":"Red team","old_assignee":"An Nguyen","new_assignee":"Binh Tran","actor":"actor-7","reason":"routing rule"}
+== fleet.agent.offline signal body
+{"schema":"synapse.notification.v1","event_type":"fleet.agent.offline","event_label":"Fleet agent offline","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":"","last_seen_at":"2026-09-27T07:45:00Z","agent_name":""}
+== fleet.agent.offline summary body
+{"schema":"synapse.notification.v1","event_type":"fleet.agent.offline","event_label":"Fleet agent offline","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","last_seen_at":"2026-09-27T07:45:00Z","agent_name":"node-42"}
+== fleet.agent.offline detail body
+{"schema":"synapse.notification.v1","event_type":"fleet.agent.offline","event_label":"Fleet agent offline","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","last_seen_at":"2026-09-27T07:45:00Z","agent_name":"node-42"}
+== incident.created signal body
+{"schema":"synapse.notification.v1","event_type":"incident.created","event_label":"Incident created","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":"","severity":"high","engagement_name":"","asset_name":""}
+== incident.created summary body
+{"schema":"synapse.notification.v1","event_type":"incident.created","event_label":"Incident created","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","severity":"high","engagement_name":"Q3 audit","asset_name":""}
+== incident.created detail body
+{"schema":"synapse.notification.v1","event_type":"incident.created","event_label":"Incident created","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","severity":"high","engagement_name":"Q3 audit","asset_name":"db-primary"}
+== quality_gate.failed signal body
+{"schema":"synapse.notification.v1","event_type":"quality_gate.failed","event_label":"Quality gate failed","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":"","failed_conditions":"2","project_name":""}
+== quality_gate.failed summary body
+{"schema":"synapse.notification.v1","event_type":"quality_gate.failed","event_label":"Quality gate failed","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","failed_conditions":"2","project_name":"Payments"}
+== quality_gate.failed detail body
+{"schema":"synapse.notification.v1","event_type":"quality_gate.failed","event_label":"Quality gate failed","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","failed_conditions":"2","project_name":"Payments"}
+== scan.completed signal body
+{"schema":"synapse.notification.v1","event_type":"scan.completed","event_label":"Scan completed","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":"","scan_kind":"sast","target":"","engagement_name":""}
+== scan.completed summary body
+{"schema":"synapse.notification.v1","event_type":"scan.completed","event_label":"Scan completed","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","scan_kind":"sast","target":"https://git.example.test/org/repo.git","engagement_name":"Q3 audit"}
+== scan.completed detail body
+{"schema":"synapse.notification.v1","event_type":"scan.completed","event_label":"Scan completed","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","scan_kind":"sast","target":"https://git.example.test/org/repo.git","engagement_name":"Q3 audit"}
+== sla.approaching_deadline signal body
+{"schema":"synapse.notification.v1","event_type":"sla.approaching_deadline","event_label":"SLA approaching deadline","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":"","tier":"high","deadline":"2026-09-28T08:00:00Z","lead_time_hours":"24","engagement_name":"","finding_title":""}
+== sla.approaching_deadline summary body
+{"schema":"synapse.notification.v1","event_type":"sla.approaching_deadline","event_label":"SLA approaching deadline","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","tier":"high","deadline":"2026-09-28T08:00:00Z","lead_time_hours":"24","engagement_name":"Q3 audit","finding_title":"SQL injection in login"}
+== sla.approaching_deadline detail body
+{"schema":"synapse.notification.v1","event_type":"sla.approaching_deadline","event_label":"SLA approaching deadline","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","tier":"high","deadline":"2026-09-28T08:00:00Z","lead_time_hours":"24","engagement_name":"Q3 audit","finding_title":"SQL injection in login"}
+== vulnerability_action.created signal body
+{"schema":"synapse.notification.v1","event_type":"vulnerability_action.created","event_label":"Vulnerability risk action","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":"","severity":"high","action_type":"escalation","engagement_name":""}
+== vulnerability_action.created summary body
+{"schema":"synapse.notification.v1","event_type":"vulnerability_action.created","event_label":"Vulnerability risk action","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","severity":"high","action_type":"escalation","engagement_name":"Q3 audit"}
+== vulnerability_action.created detail body
+{"schema":"synapse.notification.v1","event_type":"vulnerability_action.created","event_label":"Vulnerability risk action","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary.","severity":"high","action_type":"escalation","engagement_name":"Q3 audit"}
+== notification.channel_paused signal body
+{"schema":"synapse.notification.v1","event_type":"notification.channel_paused","event_label":"Channel paused","occurred_at":"2026-09-27T08:00:00Z","title":"","summary":""}
+== notification.channel_paused summary body
+{"schema":"synapse.notification.v1","event_type":"notification.channel_paused","event_label":"Channel paused","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary."}
+== notification.channel_paused detail body
+{"schema":"synapse.notification.v1","event_type":"notification.channel_paused","event_label":"Channel paused","occurred_at":"2026-09-27T08:00:00Z","title":"Example title","summary":"Example summary."}

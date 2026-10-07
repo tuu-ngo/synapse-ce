@@ -1,0 +1,198 @@
+== finding.ownership_changed signal body
+A finding's team or assignee changed.
+
+- When: 2026\-09\-27 08\:00 UTC
+== finding.ownership_changed signal subject
+[Synapse] Finding ownership changed
+== finding.ownership_changed summary body
+A finding's team or assignee changed.
+
+- Finding: SQL injection in login
+- Engagement: Q3 audit
+- Team: Blue team → Red team
+- Assignee: An Nguyen → Binh Tran
+- Changed by: actor\-7
+- Reason: routing rule
+- When: 2026\-09\-27 08\:00 UTC
+== finding.ownership_changed summary subject
+[Synapse] Finding ownership changed: SQL injection in login
+== finding.ownership_changed detail body
+A finding's team or assignee changed.
+
+- Finding: SQL injection in login
+- Engagement: Q3 audit
+- Team: Blue team → Red team
+- Assignee: An Nguyen → Binh Tran
+- Changed by: actor\-7
+- Reason: routing rule
+- When: 2026\-09\-27 08\:00 UTC
+== finding.ownership_changed detail subject
+[Synapse] Finding ownership changed: SQL injection in login
+== fleet.agent.offline signal body
+A fleet agent missed its heartbeat window and may be offline.
+
+- Last seen: 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline signal subject
+[Synapse] Fleet agent offline
+== fleet.agent.offline summary body
+A fleet agent missed its heartbeat window and may be offline.
+
+- Agent: node\-42
+- Last seen: 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline summary subject
+[Synapse] Fleet agent offline: node\-42
+== fleet.agent.offline detail body
+A fleet agent missed its heartbeat window and may be offline.
+
+- Agent: node\-42
+- Last seen: 2026\-09\-27 07\:45 UTC
+== fleet.agent.offline detail subject
+[Synapse] Fleet agent offline: node\-42
+== incident.created signal body
+Fleet correlation opened a security incident.
+
+- Severity: High
+- Opened: 2026\-09\-27 08\:00 UTC
+== incident.created signal subject
+[Synapse] High incident
+== incident.created summary body
+Fleet correlation opened a security incident.
+
+- Incident: Example title
+- Severity: High
+- Engagement: Q3 audit
+- Opened: 2026\-09\-27 08\:00 UTC
+== incident.created summary subject
+[Synapse] High incident: Example title
+== incident.created detail body
+Fleet correlation opened a security incident.
+
+- Incident: Example title
+- Severity: High
+- Asset: db\-primary
+- Engagement: Q3 audit
+- Opened: 2026\-09\-27 08\:00 UTC
+== incident.created detail subject
+[Synapse] High incident: Example title
+== quality_gate.failed signal body
+A project analysis failed its quality gate.
+
+- Failed conditions: 2
+- Analysed: 2026\-09\-27 08\:00 UTC
+== quality_gate.failed signal subject
+[Synapse] Quality gate failed
+== quality_gate.failed summary body
+A project analysis failed its quality gate.
+
+- Project: Payments
+- Failed conditions: 2
+- Analysed: 2026\-09\-27 08\:00 UTC
+== quality_gate.failed summary subject
+[Synapse] Quality gate failed for Payments
+== quality_gate.failed detail body
+A project analysis failed its quality gate.
+
+- Project: Payments
+- Failed conditions: 2
+- Analysed: 2026\-09\-27 08\:00 UTC
+== quality_gate.failed detail subject
+[Synapse] Quality gate failed for Payments
+== scan.completed signal body
+A sast scan finished.
+
+- Finished: 2026\-09\-27 08\:00 UTC
+== scan.completed signal subject
+[Synapse] Scan completed
+== scan.completed summary body
+A sast scan finished.
+
+- Target: https\:\/\/git\.example\.test\/org\/repo\.git
+- Engagement: Q3 audit
+- Finished: 2026\-09\-27 08\:00 UTC
+== scan.completed summary subject
+[Synapse] Scan completed for Q3 audit
+== scan.completed detail body
+A sast scan finished.
+
+- Target: https\:\/\/git\.example\.test\/org\/repo\.git
+- Engagement: Q3 audit
+- Finished: 2026\-09\-27 08\:00 UTC
+== scan.completed detail subject
+[Synapse] Scan completed for Q3 audit
+== sla.approaching_deadline signal body
+A high finding is approaching its remediation deadline.
+
+- Deadline: 2026\-09\-28 08\:00 UTC
+- Reminder sent 24 h ahead
+
+== sla.approaching_deadline signal subject
+[Synapse] Remediation due 2026\-09\-28 08\:00 UTC
+== sla.approaching_deadline summary body
+A high finding is approaching its remediation deadline.
+
+- Finding: SQL injection in login
+- Engagement: Q3 audit
+- Deadline: 2026\-09\-28 08\:00 UTC
+- Reminder sent 24 h ahead
+
+== sla.approaching_deadline summary subject
+[Synapse] Remediation due 2026\-09\-28 08\:00 UTC: SQL injection in login
+== sla.approaching_deadline detail body
+A high finding is approaching its remediation deadline.
+
+- Finding: SQL injection in login
+- Engagement: Q3 audit
+- Deadline: 2026\-09\-28 08\:00 UTC
+- Reminder sent 24 h ahead
+
+== sla.approaching_deadline detail subject
+[Synapse] Remediation due 2026\-09\-28 08\:00 UTC: SQL injection in login
+== vulnerability_action.created signal body
+A vulnerability risk action needs your review.
+
+- Action: escalation
+- Severity: High
+- Raised: 2026\-09\-27 08\:00 UTC
+== vulnerability_action.created signal subject
+[Synapse] High risk action
+== vulnerability_action.created summary body
+A vulnerability risk action needs your review.
+
+- Item: Example title
+- Action: escalation
+- Severity: High
+- Engagement: Q3 audit
+- Raised: 2026\-09\-27 08\:00 UTC
+== vulnerability_action.created summary subject
+[Synapse] High risk action in Q3 audit
+== vulnerability_action.created detail body
+A vulnerability risk action needs your review.
+
+- Item: Example title
+- Action: escalation
+- Severity: High
+- Engagement: Q3 audit
+- Raised: 2026\-09\-27 08\:00 UTC
+== vulnerability_action.created detail subject
+[Synapse] High risk action in Q3 audit
+== notification.channel_paused signal body
+A Channel paused event occurred in Synapse.
+
+- Event: notification\.channel\_paused
+- When: 2026\-09\-27 08\:00 UTC
+== notification.channel_paused signal subject
+[Synapse] Channel paused
+== notification.channel_paused summary body
+Example summary\.
+
+- Event: notification\.channel\_paused
+- When: 2026\-09\-27 08\:00 UTC
+== notification.channel_paused summary subject
+[Synapse] Example title
+== notification.channel_paused detail body
+Example summary\.
+
+- Event: notification\.channel\_paused
+- When: 2026\-09\-27 08\:00 UTC
+== notification.channel_paused detail subject
+[Synapse] Example title
