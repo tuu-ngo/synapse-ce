@@ -29,6 +29,7 @@ import (
 	"github.com/KKloudTarus/synapse-ce/internal/composition/scacompose"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/agent"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/cloudposture"
+	"github.com/KKloudTarus/synapse-ce/internal/domain/consolelink"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/evidence"
 	integrationdom "github.com/KKloudTarus/synapse-ce/internal/domain/integration"
 	"github.com/KKloudTarus/synapse-ce/internal/domain/judgment"
@@ -44,6 +45,7 @@ import (
 	jenkinsintegration "github.com/KKloudTarus/synapse-ce/internal/infrastructure/integration/jenkins"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/llm/openai"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/logstream"
+	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/messageformat"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/notificationsender"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/ownershipcapture"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/persistence/postgres"
@@ -712,6 +714,27 @@ func main() {
 			os.Exit(1)
 		}
 		notificationService.SetTransactionRunner(postgres.NewTenantTransactionRunner(pool))
+		// Send-time rendering (#1365): tenant templates, the tenant's locale and time zone, and the
+		// channel formatters.
+		notificationService.SetTemplateStore(postgres.NewNotificationTemplateStore(pool))
+		notificationService.SetTenantSettings(postgres.NewTenantSettingsStore(pool))
+		notificationService.SetFormatters(messageformat.Formatters())
+		// Channels render through templates (#1367): the shipped templates back every channel without
+		// a tenant template, and messages link to the console when a public base URL is set.
+		builtinTemplates, builtinErr := notificationuc.NewBuiltinTemplates()
+		if builtinErr != nil {
+			log.Error("built-in notification templates failed to load", "err", builtinErr)
+			os.Exit(1)
+		}
+		notificationService.SetBuiltinTemplates(builtinTemplates)
+		if base := cfg.EffectivePublicBaseURL(); base != "" {
+			links, linkErr := consolelink.NewBuilder(base)
+			if linkErr != nil {
+				log.Error("public base URL is invalid", "err", linkErr)
+				os.Exit(1)
+			}
+			notificationService.SetLinkBuilder(links)
+		}
 		// Delivery metrics are emitted by this worker only: the API exposes
 		// aggregate queue health but never observes worker transport outcomes.
 		if cfg.MetricsEnabled {
@@ -1281,7 +1304,7 @@ func main() {
 				siem.ProviderSplunk:            splunk.New(5*time.Second, true),
 				siem.ProviderElasticsearch:     elastic.New(5 * time.Second),
 				siem.ProviderMicrosoftSentinel: sentinel.New(5 * time.Second),
-				siem.ProviderSyslogTLS:     syslogtls.New(5 * time.Second),
+				siem.ProviderSyslogTLS:         syslogtls.New(5 * time.Second),
 			}, auditLog, clock, ids)
 			if serviceErr != nil {
 				log.Error("siem worker init failed", "err", serviceErr)

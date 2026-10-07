@@ -17,6 +17,10 @@ import (
 // webhookDriver posts the event envelope to a generic receiver, signed with HMAC-SHA256 over
 // "<timestamp>.<body>" so the receiver can reject replays and forgeries.
 //
+// By default the body is the class-filtered envelope the send-time renderer built (#1367), sent with
+// X-Synapse-Body: envelope. A channel an administrator switched to raw_event sends the raw event, as
+// every webhook did before, with no X-Synapse-Body header.
+//
 // A channel that opted into a custom body (#1376) gets the rendered body the send-time renderer
 // put in NotificationWork.CustomWebhookBody instead. The driver sends those exact bytes, signs the
 // same bytes and sets X-Synapse-Body: custom, so the signature always covers the body as sent. It
@@ -32,13 +36,20 @@ func (d webhookDriver) Send(ctx context.Context, w ports.NotificationWork, confi
 		return ports.NotificationSendResult{ErrorCode: "channel_config_invalid"}
 	}
 	custom := len(w.CustomWebhookBody) > 0
+	envelope := !custom && len(w.WebhookEnvelope) > 0
 	var body []byte
-	if custom {
+	switch {
+	case custom:
 		if len(w.CustomWebhookBody) > notification.MaxRenderedWebhookBodyBytes || !json.Valid(w.CustomWebhookBody) {
 			return ports.NotificationSendResult{ErrorCode: "custom_body_invalid"}
 		}
 		body = w.CustomWebhookBody
-	} else {
+	case envelope:
+		if len(w.WebhookEnvelope) > notification.MaxRenderedWebhookBodyBytes || !json.Valid(w.WebhookEnvelope) {
+			return ports.NotificationSendResult{ErrorCode: "envelope_invalid"}
+		}
+		body = w.WebhookEnvelope
+	default:
 		var err error
 		if body, err = json.Marshal(w.Event); err != nil {
 			return ports.NotificationSendResult{ErrorCode: "encode_failed"}
@@ -55,8 +66,11 @@ func (d webhookDriver) Send(ctx context.Context, w ports.NotificationWork, confi
 	req.Header.Set("X-Synapse-Signature", webhookSignature(cfg.Secret, timestamp, body))
 	req.Header.Set("X-Synapse-Event-ID", w.Event.ID.String())
 	req.Header.Set("X-Synapse-Delivery-ID", w.Delivery.ID.String())
-	if custom {
+	switch {
+	case custom:
 		req.Header.Set(notification.CustomWebhookBodyHeader, "custom")
+	case envelope:
+		req.Header.Set(notification.CustomWebhookBodyHeader, notification.WebhookBodyEnvelope)
 	}
 	return d.s.do(req)
 }

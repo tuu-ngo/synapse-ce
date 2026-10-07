@@ -1,0 +1,78 @@
+== * subject
+[Synapse] {{if .title}}{{.title}}{{else}}{{.event_label}}{{end}}
+== * body
+{{if .summary}}{{.summary}}{{else}}A {{.event_label}} event occurred in Synapse.{{end}}
+
+- Event: {{.event_type}}
+- When: {{.occurred_at}}
+
+== vulnerability_action.created subject
+[Synapse] {{if .severity}}{{severity_label .severity}} {{end}}risk action{{if .engagement_name}} in {{.engagement_name}}{{end}}
+== vulnerability_action.created body
+A vulnerability risk action needs your review.
+
+{{if .title}}- Item: {{.title}}
+{{end}}- Action: {{default "review" .action_type}}
+{{if .severity}}- Severity: {{severity_label .severity}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Raised: {{.occurred_at}}
+
+== scan.completed subject
+[Synapse] Scan completed{{if .engagement_name}} for {{.engagement_name}}{{end}}
+== scan.completed body
+A {{default "security" .scan_kind}} scan finished.
+
+{{if .target}}- Target: {{.target}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Finished: {{.occurred_at}}
+
+== quality_gate.failed subject
+[Synapse] Quality gate failed{{if .project_name}} for {{.project_name}}{{end}}
+== quality_gate.failed body
+A project analysis failed its quality gate.
+
+{{if .project_name}}- Project: {{.project_name}}
+{{end}}{{if .failed_conditions}}- Failed conditions: {{.failed_conditions}}
+{{end}}- Analysed: {{.occurred_at}}
+
+== sla.approaching_deadline subject
+[Synapse] Remediation due {{.deadline}}{{if .finding_title}}: {{.finding_title}}{{end}}
+== sla.approaching_deadline body
+A {{default "tracked" .tier}} finding is approaching its remediation deadline.
+
+{{if .finding_title}}- Finding: {{.finding_title}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Deadline: {{.deadline}}
+{{if .lead_time_hours}}- Reminder sent {{.lead_time_hours}} h ahead
+{{end}}
+== fleet.agent.offline subject
+[Synapse] Fleet agent offline{{if .agent_name}}: {{.agent_name}}{{end}}
+== fleet.agent.offline body
+A fleet agent missed its heartbeat window and may be offline.
+
+{{if .agent_name}}- Agent: {{.agent_name}}
+{{end}}- Last seen: {{.last_seen_at}}
+
+== incident.created subject
+[Synapse] {{if .severity}}{{severity_label .severity}} {{end}}incident{{if .title}}: {{.title}}{{end}}
+== incident.created body
+Fleet correlation opened a security incident.
+
+{{if .title}}- Incident: {{.title}}
+{{end}}{{if .severity}}- Severity: {{severity_label .severity}}
+{{end}}{{if .asset_name}}- Asset: {{.asset_name}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}- Opened: {{.occurred_at}}
+
+== finding.ownership_changed subject
+[Synapse] Finding ownership changed{{if .finding_title}}: {{.finding_title}}{{end}}
+== finding.ownership_changed body
+A finding's team or assignee changed.
+
+{{if .finding_title}}- Finding: {{.finding_title}}
+{{end}}{{if .engagement_name}}- Engagement: {{.engagement_name}}
+{{end}}{{if .new_team}}- Team: {{if .old_team}}{{.old_team}} → {{end}}{{.new_team}}
+{{end}}{{if .new_assignee}}- Assignee: {{if .old_assignee}}{{.old_assignee}} → {{end}}{{.new_assignee}}
+{{end}}{{if .actor}}- Changed by: {{.actor}}
+{{end}}{{if .reason}}- Reason: {{.reason}}
+{{end}}- When: {{.occurred_at}}

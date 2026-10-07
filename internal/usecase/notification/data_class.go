@@ -29,6 +29,18 @@ func channelDataClass(current domain.DataClass, in ChannelInput, allowRaise bool
 	return next, nil
 }
 
+// channelRawEvent is the raw_event setting a create or update stores. Turning it on sends every
+// field of the event, so it needs allowRaise like a class raise; the domain checks the class.
+func channelRawEvent(current bool, in ChannelInput, allowRaise bool) (bool, error) {
+	if in.RawEvent == nil {
+		return current, nil
+	}
+	if *in.RawEvent && !current && !allowRaise {
+		return false, errClassRaise
+	}
+	return *in.RawEvent, nil
+}
+
 // EngagementSettingInput changes an engagement's override.
 type EngagementSettingInput struct {
 	ExternalNotifications domain.EngagementNotifications `json:"external_notifications"`
