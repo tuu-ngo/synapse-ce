@@ -9,6 +9,7 @@ and this project aims to adhere to [Semantic Versioning](https://semver.org/spec
 
 ### Added
 
+- **Console selectors for notification data classes (#1360).** The channel form under Settings → Alerting has a Data class select that starts at the channel type's default (signal for chat, summary for email and webhooks), and the channel list shows each channel's class. An engagement's Settings tab has an External notifications card for its override (each channel's class, signal only, or nothing leaves Synapse), with loading, no-override, error and permission states; choosing nothing asks for confirmation first, and a concurrent change reloads the stored value. Without `administer`, both selects offer only the current value and lower ones, matching the server's `403` on a raise.
 - Bitbucket Cloud inbound `repo:push` and open pull-request creation/update webhooks (#1453), with HMAC-SHA256 verification, request UUID and authenticated-body replay protection, and PostgreSQL transactions covering receipts and durable scan enqueue. Multi-ref pushes and deliveries during an active scan remain queued until a running slot is available; workers recheck scope before executing. Administrators can bind one existing Git Project and configure or rotate the sealed webhook secret in the console. Fork PR scans disable Git credentials and build execution and do not decorate the forge; repository acquisition always uses the Project's stored origin.
 
 ### Fixed

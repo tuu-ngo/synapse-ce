@@ -788,6 +788,25 @@ function mockTemplateRejection(fields: Record<string, string>, eventType: string
   return null
 }
 
+// Notification channels the playground starts with, one per data class default (#1360). The
+// destinations are already redacted, as the server returns them.
+type PlaygroundChannel = {
+  id: string; name: string; type: string; enabled: boolean; destination: string; recipients?: string[]
+  revision: number; secret_version: number; created_at: string; updated_at: string
+  health: { state: 'active'; consecutive_failures: number }; data_class: string; locale?: string
+}
+const notificationChannels: PlaygroundChannel[] = [
+  { id: 'chan-slack', name: 'SOC room', type: 'slack', enabled: true, destination: 'https://hooks.slack.com/…', revision: 1, secret_version: 1, created_at: MONTH_AGO, updated_at: MONTH_AGO, health: { state: 'active', consecutive_failures: 0 }, data_class: 'signal' },
+  { id: 'chan-email', name: 'Security leads', type: 'email', enabled: true, destination: 'email', recipients: ['leads@synapse.local'], revision: 1, secret_version: 1, created_at: MONTH_AGO, updated_at: MONTH_AGO, health: { state: 'active', consecutive_failures: 0 }, data_class: 'summary' },
+  { id: 'chan-hook', name: 'Ticketing bridge', type: 'webhook', enabled: true, destination: 'https://tickets.synapse.local/…', revision: 1, secret_version: 1, created_at: WEEK_AGO, updated_at: WEEK_AGO, health: { state: 'active', consecutive_failures: 0 }, data_class: 'detail' },
+]
+
+// Engagement notification overrides the playground has saved, by engagement ID (#1360).
+const engagementNotificationSettings = new Map<
+  string,
+  { engagement_id: string; external_notifications: string; revision: number; updated_at: string; updated_by: string }
+>()
+
 export const handlers = [
   // --- Auth (BFF) ---
   // discoverSession() calls GET /api/auth/session and expects an authenticated
@@ -2263,6 +2282,38 @@ func Callback(w http.ResponseWriter, r *http.Request) {
 
   // --- Notification event catalog and custom message templates (#1370, #1373) ---
   http.get('/api/v1/notifications/event-types', () => HttpResponse.json({ items: NOTIFICATION_EVENT_TYPES })),
+  // Notification channels (#1360 data classes): enough for Settings → Alerting to render and save.
+  http.get('/api/v1/notifications/channels', () => HttpResponse.json({ items: notificationChannels })),
+  http.patch('/api/v1/notifications/channels/:id', async ({ params, request }) => {
+    const body = (await request.json()) as { name?: string; enabled?: boolean; data_class?: string; revision: number }
+    const channel = notificationChannels.find((c) => c.id === params.id)
+    if (!channel) return HttpResponse.json({ error: 'notification channel not found' }, { status: 404 })
+    if (channel.revision !== body.revision) return HttpResponse.json({ error: 'notification channel revision is stale' }, { status: 409 })
+    Object.assign(channel, {
+      name: body.name ?? channel.name,
+      enabled: body.enabled ?? channel.enabled,
+      data_class: body.data_class ?? channel.data_class,
+      revision: channel.revision + 1,
+      updated_at: new Date().toISOString(),
+    })
+    return HttpResponse.json(channel)
+  }),
+  http.get('/api/v1/notifications/channels/:id/health-events', () => HttpResponse.json({ items: [] })),
+  http.get('/api/v1/notifications/rules', () => HttpResponse.json({ items: [] })),
+  http.get('/api/v1/notifications/deliveries', () => HttpResponse.json({ items: [] })),
+  http.get('/api/v1/notifications/quarantined-sources', () => HttpResponse.json({ items: [] })),
+  // Engagement external notification override (#1360): inherit at revision 0 until one is saved.
+  http.get('/api/v1/notifications/engagements/:id/settings', ({ params }) =>
+    HttpResponse.json(engagementNotificationSettings.get(String(params.id)) ?? { engagement_id: params.id, external_notifications: 'inherit', revision: 0 }),
+  ),
+  http.put('/api/v1/notifications/engagements/:id/settings', async ({ params, request }) => {
+    const body = (await request.json()) as { external_notifications: string; revision: number }
+    const current = engagementNotificationSettings.get(String(params.id))
+    if ((current?.revision ?? 0) !== body.revision) return HttpResponse.json({ error: 'engagement notification setting revision is stale' }, { status: 409 })
+    const stored = { engagement_id: String(params.id), external_notifications: body.external_notifications, revision: body.revision + 1, updated_at: new Date().toISOString(), updated_by: 'playground' }
+    engagementNotificationSettings.set(String(params.id), stored)
+    return HttpResponse.json(stored)
+  }),
   http.get('/api/v1/notifications/templates', ({ request }) => {
     const query = new URL(request.url).searchParams
     const items = TEMPLATE_STORE.filter((t) =>

@@ -4,6 +4,7 @@ import { api, AlertNotEnabledError, ApiError } from '../../lib/api'
 import type {
   NotificationChannel,
   NotificationChannelType,
+  NotificationDataClass,
   NotificationDelivery,
   NotificationSourceFailure,
   NotificationEventSpec,
@@ -39,6 +40,7 @@ import {
   replaceDestinationHint,
 } from './channelDestinations'
 import { ChannelTemplateFields, RuleTemplatePreview } from './ChannelTemplateBinding'
+import { ChannelDataClassField, DataClassPill, channelDataClass, defaultDataClass } from './ChannelDataClass'
 
 // A new rule starts on the most common subscription when the catalog offers it.
 const DEFAULT_RULE_EVENT = 'vulnerability_action.created'
@@ -372,6 +374,10 @@ function ChannelCreate({
   const [templateId, setTemplateId] = useState(initial?.template_id ?? '')
   const [locale, setLocale] = useState<NotificationLocale | ''>(initial?.locale ?? '')
   const [customBody, setCustomBody] = useState(initial?.custom_body ?? false)
+  // The class a new channel starts at follows its type until the administrator picks one (#1360).
+  const [dataClass, setDataClass] = useState<NotificationDataClass>(
+    initial ? channelDataClass(initial) : defaultDataClass(type),
+  )
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   // Without administer the destination is read-only: the server refuses a new URL, secret or
@@ -433,6 +439,11 @@ function ChannelCreate({
         custom_body:
           type === 'webhook' && customBody !== (initial?.custom_body ?? false)
             ? customBody
+            : undefined,
+        // Sent only when it differs from what the server would keep or default to.
+        data_class:
+          dataClass !== (initial ? channelDataClass(initial) : defaultDataClass(type))
+            ? dataClass
             : undefined,
       }
       if (initial) await api.updateNotificationChannel(initial.id, input)
@@ -496,7 +507,10 @@ function ChannelCreate({
             id="notification-type"
             disabled={!!initial}
             value={type}
-            onValueChange={(v) => setType(v as NotificationChannelType)}
+            onValueChange={(v) => {
+              setType(v as NotificationChannelType)
+              setDataClass(defaultDataClass(v as NotificationChannelType))
+            }}
             options={typeOptions}
           />
         </Field>
@@ -620,6 +634,14 @@ function ChannelCreate({
           onLocaleChange={setLocale}
           customBody={customBody}
           onCustomBodyChange={setCustomBody}
+          disabled={!(initial ? canManage : canAdmin)}
+        />
+        <ChannelDataClassField
+          type={type}
+          value={dataClass}
+          stored={initial ? channelDataClass(initial) : undefined}
+          canRaise={canAdmin}
+          onChange={setDataClass}
           disabled={!(initial ? canManage : canAdmin)}
         />
         <div className="flex items-end md:col-span-2">
@@ -791,6 +813,7 @@ export function ChannelList({
                 >
                   {c.enabled ? 'Enabled' : 'Disabled'}
                 </Pill>
+                <DataClassPill value={channelDataClass(c)} />
                 {paused && (
                   <Pill className="text-error-primary">
                     Paused:{' '}
