@@ -10,6 +10,7 @@ import { kindLabel } from '../../lib/format'
 import type { BusinessAsset, Engagement, ScopeTarget } from '../../lib/types'
 import { StatusPill } from '../Engagements'
 import { TARGET_KINDS } from './ReconTab'
+import { ExternalNotificationsCard } from './ExternalNotificationsCard'
 
 export function SettingsTab({ eng, onUpdated }: { eng: Engagement; onUpdated: (e: Engagement) => void }) {
   return (
@@ -21,6 +22,7 @@ export function SettingsTab({ eng, onUpdated }: { eng: Engagement; onUpdated: (e
       <RoeEditorCard eng={eng} onUpdated={onUpdated} />
       <OffensiveRoeCard eng={eng} onUpdated={onUpdated} />
       <LiveReconCard eng={eng} onUpdated={onUpdated} />
+      <ExternalNotificationsCard engagementId={eng.id} />
     </div>
   )
 }

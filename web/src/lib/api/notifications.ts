@@ -126,6 +126,11 @@ export interface NotificationChannel {
   locale?: NotificationLocale
   /** A webhook channel sends its template body as a custom JSON body (#1376). */
   custom_body?: boolean
+  /**
+   * The most sensitive content the channel's messages may carry (#1360). Absent only from a
+   * server that predates data classes; the console then reads the type's default.
+   */
+  data_class?: NotificationDataClass
 }
 export interface NotificationChannelInput {
   name: string
@@ -145,6 +150,21 @@ export interface NotificationChannelInput {
   locale?: NotificationLocale | ''
   /** Webhook only; needs a bound template. Omitted keeps the current value. */
   custom_body?: boolean
+  /**
+   * Omitted keeps the class, or the type's default on creation. Raising it needs administer;
+   * lowering it needs manage_integrations.
+   */
+  data_class?: NotificationDataClass
+}
+/** What an engagement lets leave Synapse about it (#1360); the lower of this and a channel's class wins. */
+export type NotificationEngagementOverride = 'inherit' | 'signal' | 'none'
+export interface NotificationEngagementSetting {
+  engagement_id: string
+  external_notifications: NotificationEngagementOverride
+  /** 0 when the engagement has no stored setting. */
+  revision: number
+  updated_at?: string
+  updated_by?: string
 }
 export interface NotificationRule {
   id: string
@@ -262,6 +282,20 @@ export const notificationsApi = {
     req(`/notifications/channels/${encodeURIComponent(id)}/resume`, {
       method: 'POST',
       body: JSON.stringify({ revision }),
+    }),
+  getNotificationEngagementSetting: (
+    engagementId: string,
+  ): Promise<NotificationEngagementSetting> =>
+    req(`/notifications/engagements/${encodeURIComponent(engagementId)}/settings`),
+  // The revision is the one read; the server refuses a stale one with 409.
+  putNotificationEngagementSetting: (
+    engagementId: string,
+    externalNotifications: NotificationEngagementOverride,
+    revision: number,
+  ): Promise<NotificationEngagementSetting> =>
+    req(`/notifications/engagements/${encodeURIComponent(engagementId)}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify({ external_notifications: externalNotifications, revision }),
     }),
   listNotificationChannelHealthEvents: async (
     id: string,

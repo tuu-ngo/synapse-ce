@@ -334,6 +334,13 @@ previous and new values.
 Lowering a class or an override needs `manage_integrations`. Raising either one lets
 more data leave Synapse, so it needs `administer` and answers `403` otherwise.
 
+In the console, the channel form under **Settings → Alerting** has a **Data class**
+select that starts at the type's default, and the channel list shows each channel's
+class. An engagement's **Settings** tab has an **External notifications** card for the
+override; choosing **Nothing leaves Synapse** asks for confirmation first, because the
+queued messages it cancels are not sent later. Without `administer`, both selects offer
+only the current value and lower ones.
+
 Classes take effect on message content when messages are rendered from templates
 (#1365). The built-in webhook and Slack bodies are not filtered yet; the engagement
 `none` setting already applies to every delivery.

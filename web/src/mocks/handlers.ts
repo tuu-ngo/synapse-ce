@@ -788,6 +788,12 @@ function mockTemplateRejection(fields: Record<string, string>, eventType: string
   return null
 }
 
+// Engagement notification overrides the playground has saved, by engagement ID (#1360).
+const engagementNotificationSettings = new Map<
+  string,
+  { engagement_id: string; external_notifications: string; revision: number; updated_at: string; updated_by: string }
+>()
+
 export const handlers = [
   // --- Auth (BFF) ---
   // discoverSession() calls GET /api/auth/session and expects an authenticated
@@ -2263,6 +2269,18 @@ func Callback(w http.ResponseWriter, r *http.Request) {
 
   // --- Notification event catalog and custom message templates (#1370, #1373) ---
   http.get('/api/v1/notifications/event-types', () => HttpResponse.json({ items: NOTIFICATION_EVENT_TYPES })),
+  // Engagement external notification override (#1360): inherit at revision 0 until one is saved.
+  http.get('/api/v1/notifications/engagements/:id/settings', ({ params }) =>
+    HttpResponse.json(engagementNotificationSettings.get(String(params.id)) ?? { engagement_id: params.id, external_notifications: 'inherit', revision: 0 }),
+  ),
+  http.put('/api/v1/notifications/engagements/:id/settings', async ({ params, request }) => {
+    const body = (await request.json()) as { external_notifications: string; revision: number }
+    const current = engagementNotificationSettings.get(String(params.id))
+    if ((current?.revision ?? 0) !== body.revision) return HttpResponse.json({ error: 'engagement notification setting revision is stale' }, { status: 409 })
+    const stored = { engagement_id: String(params.id), external_notifications: body.external_notifications, revision: body.revision + 1, updated_at: new Date().toISOString(), updated_by: 'playground' }
+    engagementNotificationSettings.set(String(params.id), stored)
+    return HttpResponse.json(stored)
+  }),
   http.get('/api/v1/notifications/templates', ({ request }) => {
     const query = new URL(request.url).searchParams
     const items = TEMPLATE_STORE.filter((t) =>
