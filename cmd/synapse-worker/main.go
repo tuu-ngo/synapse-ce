@@ -44,12 +44,14 @@ import (
 	jenkinsintegration "github.com/KKloudTarus/synapse-ce/internal/infrastructure/integration/jenkins"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/llm/openai"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/logstream"
+	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/messageformat"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/notificationsender"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/ownershipcapture"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/persistence/postgres"
 	recontools "github.com/KKloudTarus/synapse-ce/internal/infrastructure/recon"
 	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/sandbox"
 	elastic "github.com/KKloudTarus/synapse-ce/internal/infrastructure/siem/elastic"
+	"github.com/KKloudTarus/synapse-ce/internal/infrastructure/siem/ocsf"
 	siemseal "github.com/KKloudTarus/synapse-ce/internal/infrastructure/siem/seal"
 	sentinel "github.com/KKloudTarus/synapse-ce/internal/infrastructure/siem/sentinel"
 	splunk "github.com/KKloudTarus/synapse-ce/internal/infrastructure/siem/splunk"
@@ -712,6 +714,11 @@ func main() {
 			os.Exit(1)
 		}
 		notificationService.SetTransactionRunner(postgres.NewTenantTransactionRunner(pool))
+		// Send-time rendering (#1365): tenant templates, the tenant's locale and time zone, and the
+		// channel formatters.
+		notificationService.SetTemplateStore(postgres.NewNotificationTemplateStore(pool))
+		notificationService.SetTenantSettings(postgres.NewTenantSettingsStore(pool))
+		notificationService.SetFormatters(messageformat.Formatters())
 		// Delivery metrics are emitted by this worker only: the API exposes
 		// aggregate queue health but never observes worker transport outcomes.
 		if cfg.MetricsEnabled {
@@ -1277,12 +1284,17 @@ func main() {
 	if cfg.SIEMEnabled {
 		go func() {
 			repository := postgres.NewSIEMRepository(pool)
+			schema, schemaErr := ocsf.New()
+			if schemaErr != nil {
+				log.Error("siem schema init failed", "err", schemaErr)
+				return
+			}
 			service, serviceErr := siemuc.NewService(repository, repository, repository, siemseal.Vault{Cipher: vaultCipher}, map[siem.Provider]ports.SIEMDriver{
 				siem.ProviderSplunk:            splunk.New(5*time.Second, true),
 				siem.ProviderElasticsearch:     elastic.New(5 * time.Second),
 				siem.ProviderMicrosoftSentinel: sentinel.New(5 * time.Second),
-				siem.ProviderSyslogTLS:     syslogtls.New(5 * time.Second),
-			}, auditLog, clock, ids)
+				siem.ProviderSyslogTLS:         syslogtls.New(5 * time.Second),
+			}, auditLog, clock, ids, schema)
 			if serviceErr != nil {
 				log.Error("siem worker init failed", "err", serviceErr)
 				return
